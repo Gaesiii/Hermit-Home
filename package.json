@@ -1,0 +1,9 @@
+{
+  "name": "smart-terrarium-monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "services/*",
+    "apps/*"
+  ]
+}
