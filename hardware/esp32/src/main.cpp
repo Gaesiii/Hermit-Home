@@ -2,8 +2,12 @@
 #include "config.h"
 #include "sensors/SensorManager.h"
 #include "actuators/RelayController.h"
+#include "comms/WifiManager.h"
+#include "comms/MqttClientWrapper.h"
 
 // --- Global Objects ---
+WifiManager      wifi;
+MqttClientWrapper mqtt;
 SensorManager sensors;
 RelayController relays;
 
