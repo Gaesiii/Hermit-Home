@@ -1,1 +1,29 @@
+# Dependency directories
+node_modules/
+venv/
+env/
+
+# Environment variables (CRITICAL: NEVER COMMIT THESE)
 .env
+.env.local
+.env.development
+.env.production
+
+# Build and output directories
+dist/
+build/
+.vercel/
+.next/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PlatformIO (Hardware)
+.pio/
+.vscode/
+
+# OS metadata
+.DS_Store
+Thumbs.db
