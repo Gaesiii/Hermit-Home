@@ -74,24 +74,17 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 // ================================================================
 void setup() {
     Serial.begin(115200);
-    delay(100);
-    Serial.println(F("\n[SYSTEM] Booting Smart Terrarium Edge Controller..."));
+    // Thay vì while(!Serial), hãy dùng delay để chip tự chạy
+    delay(3000); 
+    Serial.println(F("\n[SYSTEM] Booting Smart Terrarium..."));
 
-    // 1. Initialize Hardware Abstraction Layer
     relays.init();
     sensors.init();
-
-    // 2. Load thresholds from NVS Flash (Storage Layer)
     store.loadConfig(g_config);
-
-    // 3. Initialize Communications Layer
     wifi.init();
-    
-    // Inject the callback BEFORE initializing the MQTT client
+
     mqtt.setCallback(mqttCallback);
     mqtt.init();
-
-    Serial.println(F("[SYSTEM] Boot sequence complete. Entering main loop."));
 }
 
 // ================================================================
