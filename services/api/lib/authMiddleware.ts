@@ -30,13 +30,6 @@ if (!admin.apps.length) {
 // ----------------------------------------------------------------
 //  Authenticated request type
 // ----------------------------------------------------------------
-export interface AuthenticatedRequest extends VercelRequest {
-  uid: string;
-}
-
-// ----------------------------------------------------------------
-//  verifyAuth() - Đã cập nhật "cửa ngách" cho AI Agent & Postman
-// ----------------------------------------------------------------
 export async function verifyAuth(
   req: VercelRequest,
   res: VercelResponse
