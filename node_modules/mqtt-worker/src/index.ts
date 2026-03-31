@@ -1,5 +1,6 @@
 import mqtt from 'mqtt';
 import dotenv from 'dotenv';
+import express from 'express';
 import { logger } from './utils/logger';
 import { connectDB } from './db/mongoClient';
 import { handleTelemetry } from './handlers/telemetryHandler';
@@ -76,4 +77,22 @@ async function bootstrap() {
 bootstrap().catch((err) => {
   logger.fatal({ err }, 'Failed to bootstrap mqtt-worker');
   process.exit(1);
+});
+
+
+// ---------------------------------------------------------
+// 2. THÊM ĐOẠN CODE NÀY VÀO CUỐI FILE
+// ---------------------------------------------------------
+const app = express();
+// Render sẽ tự động cấp một cổng ngẫu nhiên thông qua process.env.PORT
+const port = process.env.PORT || 10000; 
+
+// Tạo một endpoint cực nhẹ để trả lời ping
+app.get('/ping', (req, res) => {
+  res.status(200).send('MQTT Worker is awake and listening to HiveMQ!');
+});
+
+// Bật server lắng nghe
+app.listen(port, () => {
+  console.log(`[Health Check] Server is running on port ${port}`);
 });
