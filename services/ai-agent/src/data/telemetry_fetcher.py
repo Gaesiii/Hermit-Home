@@ -16,7 +16,17 @@ class TelemetryFetcher:
         try:
             response = requests.get(url, timeout=self.timeout)
             response.raise_for_status()
-            return response.json()
+            payload = response.json()
+            telemetry = payload.get("telemetry") or {}
+            device = payload.get("device") or {}
+
+            return {
+                **telemetry,
+                "device": device,
+                "mode": device.get("mode"),
+                "user_override": device.get("user_override", telemetry.get("user_override")),
+                "relays": device.get("relays", telemetry.get("relays", {}))
+            }
         except requests.exceptions.RequestException as e:
             logger.error(f"Fetcher Error: {e}")
             return None

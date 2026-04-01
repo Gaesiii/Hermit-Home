@@ -5,7 +5,12 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": true,
+    "baseUrl": ".",
     "esModuleInterop": true,
+    "moduleResolution": "node",
+    "paths": {
+      "@smart-terrarium/shared-types": ["../../packages/shared-types/dist/index"]
+    },
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },

@@ -1,6 +1,7 @@
 import { TelemetryPayload } from '@smart-terrarium/shared-types';
 import { logger } from '../utils/logger';
 import { insertTelemetry } from '../db/telemetryRepo';
+import { upsertDeviceStateFromTelemetry } from '../db/deviceRepo';
 
 export async function handleTelemetry(topic: string, message: Buffer): Promise<void> {
   try {
@@ -19,6 +20,7 @@ export async function handleTelemetry(topic: string, message: Buffer): Promise<v
 
     // Insert into database
     await insertTelemetry(userId, payload);
+    await upsertDeviceStateFromTelemetry(userId, payload);
     
   } catch (error) {
     logger.error({ err: error, topic, payload: message.toString() }, 'Failed to parse or process telemetry message');

@@ -7,8 +7,13 @@ class Recommender:
     @staticmethod
     def evaluate_conditions(telemetry: Dict[str, Any]) -> Dict[str, bool]:
         command = {}
+        mode = telemetry.get('mode')
         humidity = telemetry.get('humidity')
         current_mist_state = telemetry.get('relays', {}).get('mist')
+
+        if mode == 'MANUAL':
+            logger.info("Decision: Device is in MANUAL mode. Skip AI control.")
+            return command
 
         if humidity is None:
             logger.warning("Missing humidity data for evaluation.")
