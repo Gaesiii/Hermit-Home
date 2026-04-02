@@ -2,10 +2,11 @@
   "name": "api",
   "version": "1.0.0",
   "private": true,
-  "scripts": {
-    "build": "tsc",
-    "start": "node dist/api/status.js"
-  },
+"scripts": {
+  "build": "tsc",
+  "start": "node dist/api/status.js",
+  "local": "vercel dev --listen 0.0.0.0:3000"
+},
   "dependencies": {
     "@smart-terrarium/shared-types": "file:../../packages/shared-types",
     "bcryptjs": "^3.0.3",

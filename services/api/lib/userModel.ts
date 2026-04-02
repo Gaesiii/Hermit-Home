@@ -32,8 +32,6 @@ if (!MONGODB_URI) {
   throw new Error('Missing required environment variable: MONGODB_URI');
 }
 
-// Vercel spins up many short-lived Node processes. Caching the client on
-// `global` prevents opening a new TCP connection on every function invocation.
 let cachedClient: MongoClient | null = (global as any)._mongoClient ?? null;
 let cachedDb:     Db          | null = (global as any)._mongoDb     ?? null;
 
@@ -45,8 +43,6 @@ async function connectToDatabase(): Promise<Db> {
   const client = await MongoClient.connect(MONGODB_URI);
   const db     = client.db(MONGODB_DB);
 
-  // Persist across hot-reloads in development and across invocations
-  // in the same Vercel worker process.
   cachedClient = client;
   cachedDb     = db;
   (global as any)._mongoClient = client;
@@ -58,16 +54,30 @@ async function connectToDatabase(): Promise<Db> {
 // ─── Collection helper ────────────────────────────────────────────────────────
 
 /**
- * Returns the typed `users` collection and guarantees the required
- * indexes exist. Safe to call on every invocation — MongoDB is a no-op
- * when indexes are already in place.
+ * Returns the typed `users` collection and guarantees the unique email index
+ * exists on every invocation.
+ *
+ * createIndex is idempotent — MongoDB silently skips the operation when the
+ * index already exists, so calling this on every request is safe and costs
+ * only ~1 ms on warm connections.
+ *
+ * WHY THIS MUST NOT BE COMMENTED OUT:
+ * The application-level duplicate check (findOne → insertOne) has an inherent
+ * race condition. Two concurrent registrations with the same email can both
+ * pass findOne before either insertOne runs, resulting in duplicate accounts.
+ * The unique index is the only reliable, atomic guard against this scenario —
+ * when the second insertOne fires, MongoDB rejects it with error code 11000,
+ * which register.ts catches and maps to a 409 response.
  */
 export async function getUsersCollection(): Promise<Collection<UserDocument>> {
   const db         = await connectToDatabase();
   const collection = db.collection<UserDocument>('users');
 
-  // Unique index prevents duplicate accounts and makes email lookups O(log n).
-  //await collection.createIndex({ email: 1 }, { unique: true, name: 'email_unique' });
+  // This is intentionally NOT commented out. See the comment above.
+  await collection.createIndex(
+    { email: 1 },
+    { unique: true, name: 'email_unique' },
+  );
 
   return collection;
 }
@@ -87,9 +97,6 @@ export async function hashPassword(plain: string): Promise<string> {
 /**
  * Constant-time comparison of a plain-text password against a stored hash.
  * Returns `true` only when they match.
- *
- * Constant time is critical: a naive string comparison would allow an attacker
- * to infer valid passwords through response-timing differences.
  */
 export async function verifyPassword(
   plain: string,
@@ -101,8 +108,8 @@ export async function verifyPassword(
 // ─── Projection helper ────────────────────────────────────────────────────────
 
 /**
- * Strips secrets from a full `UserDocument` before the object leaves
- * the API layer. Always use this instead of returning `user` directly.
+ * Strips secrets from a full UserDocument before the object leaves the API layer.
+ * Always use this instead of returning the raw document.
  */
 export function toPublicUser(user: UserDocument): PublicUser {
   return {

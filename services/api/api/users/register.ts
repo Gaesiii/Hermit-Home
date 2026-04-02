@@ -35,6 +35,16 @@ export default async function handler(
   req: VercelRequest,
   res: VercelResponse,
 ): Promise<void> {
+  // ── OPTIONS preflight ────────────────────────────────────────────────────────
+  // vercel.json already injects the Access-Control-* headers on every route.
+  // This guard ensures the function itself never returns 405 to a preflight,
+  // which would cause some HTTP clients to treat CORS as failed even when
+  // the headers are present.
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
     return;
@@ -55,7 +65,6 @@ export default async function handler(
     // ── 2. Guard against duplicate accounts ────────────────────────────────────
     const existing = await users.findOne({ email });
     if (existing) {
-      // Deliberately vague — avoids leaking which emails are registered.
       res.status(409).json({ error: 'An account with that email already exists.' });
       return;
     }
