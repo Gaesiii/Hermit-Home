@@ -15,5 +15,5 @@
       "@smart-terrarium/shared-types": ["../../packages/shared-types/dist/index"]
     }
   },
-  "include": ["api/**/*", "lib/**/*"]
+  "include": ["api/**/*", "lib/**/*", "../lib/userModel.ts"]
 }
