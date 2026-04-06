@@ -1,0 +1,31 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "services/api/api/**/*.ts",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/devices/([^/]+)/status",
+      "dest": "/services/api/api/devices/[deviceId]/status.ts"
+    },
+    {
+      "src": "/api/devices/([^/]+)/override",
+      "dest": "/services/api/api/devices/[deviceId]/override.ts"
+    },
+    {
+      "src": "/api/devices/schedules",
+      "dest": "/services/api/api/devices/schedules/index.ts"
+    },
+    {
+      "src": "/api/devices",
+      "dest": "/services/api/api/devices/index.ts"
+    },
+    {
+      "src": "/api/auth/(.*)",
+      "dest": "/services/api/api/auth/[...nextauth].ts"
+    }
+  ]
+}
