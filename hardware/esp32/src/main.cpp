@@ -63,6 +63,26 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
         // 2. Immediately enforce any relay state changes 
         // (e.g., instant User Overrides)
         relays.applyAll(g_relayState);
+
+        // 3. Publish per-device command acknowledgements for manual overrides.
+        // This makes end-to-end verification easier on the backend side:
+        // API -> MQTT command -> ESP32 apply -> MQTT confirm.
+        if (doc["user_override"].as<bool>() == true) {
+            JsonObjectConst devicesObj = doc["devices"].as<JsonObjectConst>();
+
+            if (devicesObj["heater"].is<bool>()) {
+                mqtt.publishConfirmation("heater", g_relayState.heater);
+            }
+            if (devicesObj["mist"].is<bool>()) {
+                mqtt.publishConfirmation("mist", g_relayState.mist);
+            }
+            if (devicesObj["fan"].is<bool>()) {
+                mqtt.publishConfirmation("fan", g_relayState.fan);
+            }
+            if (devicesObj["light"].is<bool>()) {
+                mqtt.publishConfirmation("light", g_relayState.light);
+            }
+        }
     } else {
         Serial.print(F("[MQTT] JSON parse failed: "));
         Serial.println(error.c_str());

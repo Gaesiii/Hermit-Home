@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import mqtt, { IClientOptions, MqttClient } from 'mqtt';
 import { connectDB } from './db/mongoClient';
 import { handleTelemetry } from './handlers/telemetryHandler';
+import { handleConfirm } from './handlers/confirmHandler';
 import { logger } from './utils/logger';
 
 dotenv.config();
@@ -68,6 +69,7 @@ async function bootstrap(): Promise<void> {
 
   const allowedDeviceIds = parseAllowedDeviceIds();
   const authorizedTopics = allowedDeviceIds.map((deviceId) => `terrarium/telemetry/${deviceId}`);
+  const authorizedConfirmTopics = allowedDeviceIds.map((deviceId) => `terrarium/confirm/${deviceId}`);
   const allowedDeviceIdSet = new Set(allowedDeviceIds);
   const brokerUrl = `mqtts://${host}:${port}`;
 
@@ -76,13 +78,15 @@ async function bootstrap(): Promise<void> {
   const mqttClient = mqtt.connect(brokerUrl, buildMqttOptions());
 
   mqttClient.on('connect', () => {
-    mqttClient.subscribe(authorizedTopics, { qos: 1 }, (err, granted) => {
+    const topicsToSubscribe = [...authorizedTopics, ...authorizedConfirmTopics];
+
+    mqttClient.subscribe(topicsToSubscribe, { qos: 1 }, (err, granted) => {
       if (err) {
-        logger.error({ err, authorizedTopics }, 'Failed to subscribe to telemetry topics');
+        logger.error({ err, topicsToSubscribe }, 'Failed to subscribe to MQTT topics');
         return;
       }
 
-      logger.info({ granted }, 'Subscribed to authorized telemetry topics');
+      logger.info({ granted }, 'Subscribed to authorized telemetry and confirm topics');
     });
   });
 
@@ -92,6 +96,9 @@ async function bootstrap(): Promise<void> {
 
   mqttClient.on('message', (topic: string, message: Buffer) => {
     if (!topic.startsWith('terrarium/telemetry/')) {
+      if (topic.startsWith('terrarium/confirm/')) {
+        handleConfirm(topic, message, allowedDeviceIdSet);
+      }
       return;
     }
 
