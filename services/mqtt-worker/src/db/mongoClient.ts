@@ -4,7 +4,15 @@ import { logger } from '../utils/logger';
 
 dotenv.config();
 
-const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017';
+const isProductionRuntime =
+  process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+const mongoUriFromEnv = process.env.MONGODB_URI;
+
+if (isProductionRuntime && !mongoUriFromEnv) {
+  throw new Error('MONGODB_URI is required in production runtime.');
+}
+
+const uri = mongoUriFromEnv || 'mongodb://localhost:27017';
 const dbName = process.env.MONGODB_DB_NAME || 'terrarium';
 const maxPoolSize = Number.parseInt(process.env.MONGODB_MAX_POOL_SIZE || '10', 10);
 
