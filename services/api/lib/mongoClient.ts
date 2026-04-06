@@ -1,35 +1,52 @@
-import { MongoClient, Db } from 'mongodb';
+import { Db, MongoClient, MongoClientOptions } from 'mongodb';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 const MONGODB_URI = process.env.MONGODB_URI || '';
 const MONGODB_DB = process.env.MONGODB_DB_NAME || 'hermit-home';
+const MONGODB_MAX_POOL_SIZE = Number.parseInt(process.env.MONGODB_MAX_POOL_SIZE || '10', 10);
 
 if (!MONGODB_URI) {
   throw new Error('Please define the MONGODB_URI environment variable');
 }
 
-/**
- * Global is used here to maintain a cached connection across hot reloads
- * in development and serverless function invocations in production.
- */
-let cachedClient: MongoClient | null = (global as any).mongoClient || null;
-let cachedDb: Db | null = (global as any).mongoDb || null;
+const clientOptions: MongoClientOptions = {
+  maxPoolSize: Number.isFinite(MONGODB_MAX_POOL_SIZE) ? MONGODB_MAX_POOL_SIZE : 10,
+  minPoolSize: 0,
+  serverSelectionTimeoutMS: 5000,
+};
 
-export async function connectToDatabase() {
-  if (cachedClient && cachedDb) {
-    return { client: cachedClient, db: cachedDb };
+declare global {
+  // eslint-disable-next-line no-var
+  var mongoClientPromise: Promise<MongoClient> | undefined;
+  // eslint-disable-next-line no-var
+  var mongoClient: MongoClient | undefined;
+  // eslint-disable-next-line no-var
+  var mongoDb: Db | undefined;
+}
+
+const globalMongo = globalThis as typeof globalThis & {
+  mongoClientPromise?: Promise<MongoClient>;
+  mongoClient?: MongoClient;
+  mongoDb?: Db;
+};
+
+if (!globalMongo.mongoClientPromise) {
+  const client = new MongoClient(MONGODB_URI, clientOptions);
+  globalMongo.mongoClientPromise = client.connect();
+}
+
+export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db }> {
+  if (globalMongo.mongoClient && globalMongo.mongoDb) {
+    return { client: globalMongo.mongoClient, db: globalMongo.mongoDb };
   }
 
-  const client = await MongoClient.connect(MONGODB_URI);
+  const client = await globalMongo.mongoClientPromise!;
   const db = client.db(MONGODB_DB);
 
-  cachedClient = client;
-  cachedDb = db;
-  
-  (global as any).mongoClient = client;
-  (global as any).mongoDb = db;
+  globalMongo.mongoClient = client;
+  globalMongo.mongoDb = db;
 
   return { client, db };
 }

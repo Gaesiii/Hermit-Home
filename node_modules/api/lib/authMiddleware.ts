@@ -1,76 +1,94 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import * as admin from 'firebase-admin';
 
-// ----------------------------------------------------------------
-//  Firebase Admin SDK — singleton initialization
-// ----------------------------------------------------------------
-if (!admin.apps.length) {
-  const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+let firebaseInitialized = false;
 
-  if (!serviceAccountKey) {
-    throw new Error(
-      '[authMiddleware] FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set. ' +
-      'Add the full JSON key string to your Vercel project environment variables.'
-    );
+function readHeaderValue(value: string | string[] | undefined): string | null {
+  if (typeof value === 'string') {
+    return value;
   }
 
-  try {
-    const serviceAccount = JSON.parse(serviceAccountKey);
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-    });
-  } catch {
-    throw new Error(
-      '[authMiddleware] Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY. ' +
-      'Ensure it is a valid JSON string (not a file path).'
-    );
+  if (Array.isArray(value) && value.length > 0) {
+    return value[0];
   }
+
+  return null;
 }
 
-// ----------------------------------------------------------------
-//  Authenticated request type
-// ----------------------------------------------------------------
+function ensureFirebaseInitialized(): void {
+  if (firebaseInitialized || admin.apps.length > 0) {
+    firebaseInitialized = true;
+    return;
+  }
+
+  const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+  if (!serviceAccountKey) {
+    throw new Error(
+      '[authMiddleware] FIREBASE_SERVICE_ACCOUNT_KEY is required for Bearer-token authentication.'
+    );
+  }
+
+  let serviceAccount: admin.ServiceAccount;
+  try {
+    serviceAccount = JSON.parse(serviceAccountKey) as admin.ServiceAccount;
+  } catch {
+    throw new Error(
+      '[authMiddleware] FIREBASE_SERVICE_ACCOUNT_KEY must be a valid JSON string.'
+    );
+  }
+
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+  firebaseInitialized = true;
+}
+
 export async function verifyAuth(
   req: VercelRequest,
   res: VercelResponse
 ): Promise<string | null> {
-  
-  // ----------------------------------------------------------------
-  // 🚪 CỬA NGÁCH CHO AI AGENT & POSTMAN (Server-to-Server)
-  // ----------------------------------------------------------------
-  const apiKey = req.headers['x-api-key'];
-  if (apiKey && apiKey === process.env.SERVICE_API_KEY) {
-    // Nếu đúng khóa bí mật, giả lập uid chính là deviceId để 
-    // lọt qua được bước kiểm tra Ownership (uid === deviceId) ở route.
-    const { deviceId } = req.query;
-    return typeof deviceId === 'string' ? deviceId : 'service-account';
-  }
+  const providedApiKey = readHeaderValue(req.headers['x-api-key']);
+  const expectedApiKey = process.env.SERVICE_API_KEY || '';
 
-  // ----------------------------------------------------------------
-  // 🚪 CỬA CHÍNH DÀNH CHO NGƯỜI DÙNG (Firebase App)
-  // ----------------------------------------------------------------
-  const authHeader = req.headers['authorization'];
+  if (providedApiKey) {
+    if (expectedApiKey && providedApiKey === expectedApiKey) {
+      const { deviceId } = req.query;
+      return typeof deviceId === 'string' ? deviceId : 'service-account';
+    }
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
     res.status(401).json({
       error: 'Unauthorized',
-      message: 'Missing or malformed Authorization header. Expected: Bearer <token>',
+      message: 'Invalid service API key.',
     });
     return null;
   }
 
-  const idToken = authHeader.split('Bearer ')[1].trim();
+  const authHeader = readHeaderValue(req.headers.authorization);
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    res.status(401).json({
+      error: 'Unauthorized',
+      message: 'Missing Authorization header. Expected: Bearer <token>',
+    });
+    return null;
+  }
 
+  const idToken = authHeader.slice('Bearer '.length).trim();
   if (!idToken) {
-    res.status(401).json({ error: 'Unauthorized', message: 'Bearer token is empty.' });
+    res.status(401).json({
+      error: 'Unauthorized',
+      message: 'Bearer token is empty.',
+    });
     return null;
   }
 
   try {
+    ensureFirebaseInitialized();
     const decodedToken = await admin.auth().verifyIdToken(idToken);
     return decodedToken.uid;
   } catch (error: unknown) {
-    const isExpired = error instanceof Error && error.message.includes('expired');
+    const isExpired =
+      error instanceof Error && error.message.toLowerCase().includes('expired');
+
     res.status(401).json({
       error: 'Unauthorized',
       message: isExpired ? 'Token has expired.' : 'Invalid token.',

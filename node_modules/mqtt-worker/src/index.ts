@@ -1,71 +1,116 @@
-import mqtt from 'mqtt';
-import dotenv from 'dotenv';
 import express from 'express';
-import { logger } from './utils/logger';
+import dotenv from 'dotenv';
+import mqtt, { IClientOptions, MqttClient } from 'mqtt';
 import { connectDB } from './db/mongoClient';
 import { handleTelemetry } from './handlers/telemetryHandler';
+import { logger } from './utils/logger';
 
 dotenv.config();
 
-async function bootstrap() {
-  // 1. Connect to MongoDB
-  await connectDB();
+const DEVICE_ID_REGEX = /^[a-f\d]{24}$/i;
 
-  // 2. Setup MQTT Connection Options
-  const protocol = 'mqtts'; // Using secure MQTT for HiveMQ
-  const host = process.env.MQTT_BROKER || '';
-  const port = process.env.MQTT_PORT ? parseInt(process.env.MQTT_PORT, 10) : 8883;
+function parseAllowedDeviceIds(): string[] {
+  const raw = process.env.ALLOWED_DEVICE_IDS || process.env.DEVICE_ID || '';
+  const ids = raw
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
+
+  if (ids.length === 0) {
+    throw new Error(
+      'Missing ALLOWED_DEVICE_IDS (or DEVICE_ID). Configure at least one authorized device id.'
+    );
+  }
+
+  const uniqueIds = [...new Set(ids)];
+  for (const id of uniqueIds) {
+    if (!DEVICE_ID_REGEX.test(id)) {
+      throw new Error(`Invalid device id in ALLOWED_DEVICE_IDS: "${id}"`);
+    }
+  }
+
+  return uniqueIds;
+}
+
+function buildMqttOptions(): IClientOptions {
   const username = process.env.MQTT_USER || '';
   const password = process.env.MQTT_PASS || '';
+  const caCert = process.env.MQTT_CA_CERT?.replace(/\\n/g, '\n');
 
-  const brokerUrl = `${protocol}://${host}:${port}`;
+  if (!username || !password) {
+    throw new Error('Missing MQTT credentials. Check MQTT_USER and MQTT_PASS.');
+  }
 
-  logger.info(`Connecting to MQTT broker at ${brokerUrl}...`);
-
-  const mqttClient = mqtt.connect(brokerUrl, {
+  const options: IClientOptions = {
     username,
     password,
-    clientId: `mqtt-worker-${Math.random().toString(16).substring(2, 10)}`,
-    rejectUnauthorized: false // Required for some HiveMQ configurations matching the ESP32 setup
-  });
+    clientId: `mqtt-worker-${Math.random().toString(16).slice(2, 10)}`,
+    rejectUnauthorized: true,
+    reconnectPeriod: 2000,
+    connectTimeout: 5000,
+  };
 
-  // 3. Handle Connection Events
+  if (caCert) {
+    options.ca = caCert;
+  }
+
+  return options;
+}
+
+async function bootstrap(): Promise<void> {
+  await connectDB();
+
+  const host = process.env.MQTT_BROKER || '';
+  const port = Number.parseInt(process.env.MQTT_PORT || '8883', 10);
+  if (!host) {
+    throw new Error('Missing MQTT_BROKER environment variable.');
+  }
+
+  const allowedDeviceIds = parseAllowedDeviceIds();
+  const authorizedTopics = allowedDeviceIds.map((deviceId) => `terrarium/telemetry/${deviceId}`);
+  const allowedDeviceIdSet = new Set(allowedDeviceIds);
+  const brokerUrl = `mqtts://${host}:${port}`;
+
+  logger.info({ brokerUrl, allowedDeviceIds }, 'Connecting to MQTT broker');
+
+  const mqttClient = mqtt.connect(brokerUrl, buildMqttOptions());
+
   mqttClient.on('connect', () => {
-    logger.info('✅ Connected to HiveMQ MQTT Broker');
-    
-    const telemetryTopic = 'terrarium/telemetry/+';
-    mqttClient.subscribe(telemetryTopic, (err) => {
+    mqttClient.subscribe(authorizedTopics, { qos: 1 }, (err, granted) => {
       if (err) {
-        logger.error({ err }, `Failed to subscribe to ${telemetryTopic}`);
-      } else {
-        logger.info(`📡 Subscribed to topic: ${telemetryTopic}`);
+        logger.error({ err, authorizedTopics }, 'Failed to subscribe to telemetry topics');
+        return;
       }
+
+      logger.info({ granted }, 'Subscribed to authorized telemetry topics');
     });
   });
 
-  mqttClient.on('error', (err) => {
-    logger.error({ err }, 'MQTT Client Error');
+  mqttClient.on('error', (err: Error) => {
+    logger.error({ err }, 'MQTT client error');
   });
 
-  // 4. Message Router
   mqttClient.on('message', (topic: string, message: Buffer) => {
-    if (topic.startsWith('terrarium/telemetry/')) {
-      handleTelemetry(topic, message);
+    if (!topic.startsWith('terrarium/telemetry/')) {
+      return;
     }
+
+    void handleTelemetry(topic, message, allowedDeviceIdSet);
   });
 
-  // 5. Graceful Shutdown
-  const shutdown = async (signal: string) => {
-    logger.info(`\n${signal} received. Shutting down gracefully...`);
-    
+  registerShutdownHandlers(mqttClient);
+}
+
+function registerShutdownHandlers(mqttClient: MqttClient): void {
+  const shutdown = (signal: string) => {
+    logger.info({ signal }, 'Shutting down mqtt-worker');
     mqttClient.end(false, () => {
-      logger.info('MQTT client disconnected.');
+      logger.info('MQTT client disconnected');
       process.exit(0);
     });
 
-    // Fallback force exit if it hangs
     setTimeout(() => {
-      logger.error('Forcing shutdown due to timeout');
+      logger.error('Forced shutdown after timeout');
       process.exit(1);
     }, 5000);
   };
@@ -74,25 +119,21 @@ async function bootstrap() {
   process.on('SIGTERM', () => shutdown('SIGTERM'));
 }
 
-bootstrap().catch((err) => {
+function startHealthServer(): void {
+  const app = express();
+  const port = Number.parseInt(process.env.PORT || '10000', 10);
+
+  app.get('/ping', (_req, res) => {
+    res.status(200).send('MQTT Worker is running');
+  });
+
+  app.listen(port, () => {
+    logger.info({ port }, 'Health server started');
+  });
+}
+
+startHealthServer();
+bootstrap().catch((err: unknown) => {
   logger.fatal({ err }, 'Failed to bootstrap mqtt-worker');
   process.exit(1);
-});
-
-
-// ---------------------------------------------------------
-// 2. THÊM ĐOẠN CODE NÀY VÀO CUỐI FILE
-// ---------------------------------------------------------
-const app = express();
-// Render sẽ tự động cấp một cổng ngẫu nhiên thông qua process.env.PORT
-const port = process.env.PORT || 10000; 
-
-// Tạo một endpoint cực nhẹ để trả lời ping
-app.get('/ping', (req, res) => {
-  res.status(200).send('MQTT Worker is awake and listening to HiveMQ!');
-});
-
-// Bật server lắng nghe
-app.listen(port, () => {
-  console.log(`[Health Check] Server is running on port ${port}`);
 });
