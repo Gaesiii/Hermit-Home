@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    network_security_config.xml
+    ───────────────────────────────────────────────────────────────────────────
+    Allows plaintext HTTP only to private LAN addresses used during local
+    development. All other traffic (including production Vercel) must use HTTPS.
+
+    RFC-1918 private ranges covered:
+      10.0.0.0/8      — corporate / home networks
+      172.16.0.0/12   — less common but valid home router range
+      192.168.0.0/16  — the most common home router range (your 192.168.2.x)
+      10.0.2.2        — Android emulator alias for host machine localhost
+
+    When you switch to production, just update apiBaseUrl in AppConstants to
+    your https:// Vercel URL and this config becomes a no-op for that traffic.
+-->
+<network-security-config>
+
+    <!-- PRODUCTION: enforce HTTPS for all public domains by default -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- DEVELOPMENT: allow cleartext only on private LAN / emulator addresses -->
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- Android emulator → host machine -->
+        <domain includeSubdomains="false">10.0.2.2</domain>
+
+        <!-- Common home/office LAN ranges -->
+        <domain includeSubdomains="false">192.168.0.1</domain>
+        <domain includeSubdomains="false">192.168.1.1</domain>
+        <domain includeSubdomains="false">192.168.2.1</domain>
+
+        <!--
+            Add your specific dev machine IP here.
+            Run `ipconfig` (Windows) or `ifconfig` (Mac/Linux) to find it.
+            Your current dev machine IP based on AppConstants: 192.168.2.78
+        -->
+        <domain includeSubdomains="false">192.168.2.78</domain>
+
+        <!-- localhost variants (useful for iOS Simulator / desktop) -->
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+
+</network-security-config>

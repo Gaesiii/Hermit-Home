@@ -3,6 +3,17 @@ import * as admin from 'firebase-admin';
 
 let firebaseInitialized = false;
 
+export interface AuthenticatedRequest extends VercelRequest {
+  user: {
+    userId: string;
+  };
+}
+
+type AuthenticatedHandler = (
+  req: AuthenticatedRequest,
+  res: VercelResponse
+) => Promise<void> | void;
+
 function readHeaderValue(value: string | string[] | undefined): string | null {
   if (typeof value === 'string') {
     return value;
@@ -95,4 +106,17 @@ export async function verifyAuth(
     });
     return null;
   }
+}
+
+export function withAuth(handler: AuthenticatedHandler) {
+  return async (req: VercelRequest, res: VercelResponse): Promise<void> => {
+    const userId = await verifyAuth(req, res);
+    if (userId === null) {
+      return;
+    }
+
+    const authenticatedReq = req as AuthenticatedRequest;
+    authenticatedReq.user = { userId };
+    await handler(authenticatedReq, res);
+  };
 }
