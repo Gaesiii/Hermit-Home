@@ -9,6 +9,36 @@ import { logger } from './utils/logger';
 dotenv.config();
 
 const DEVICE_ID_REGEX = /^[a-f\d]{24}$/i;
+const DEFAULT_SELF_PING_INTERVAL_MS = 3 * 60 * 1000;
+const DEFAULT_SELF_PING_TIMEOUT_MS = 10_000;
+const SELF_PING_USER_AGENT = 'mqtt-worker-self-keepalive/1.0';
+
+function parsePositiveInteger(value: string | undefined, fallback: number): number {
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+
+  return parsed;
+}
+
+function resolveSelfPingUrl(): string | null {
+  const explicitSelfPingUrl = process.env.SELF_PING_URL?.trim();
+  if (explicitSelfPingUrl) {
+    return explicitSelfPingUrl;
+  }
+
+  const renderExternalUrl = process.env.RENDER_EXTERNAL_URL?.trim();
+  if (!renderExternalUrl) {
+    return null;
+  }
+
+  return `${renderExternalUrl.replace(/\/+$/, '')}/ping`;
+}
 
 function parseAllowedDeviceIds(): string[] {
   const raw = process.env.ALLOWED_DEVICE_IDS || process.env.DEVICE_ID || '';
@@ -139,7 +169,65 @@ function startHealthServer(): void {
   });
 }
 
+function startSelfKeepalivePingLoop(): void {
+  const targetUrl = resolveSelfPingUrl();
+  if (!targetUrl) {
+    logger.warn(
+      'Self keepalive ping disabled. Configure SELF_PING_URL or RENDER_EXTERNAL_URL to enable it.'
+    );
+    return;
+  }
+
+  const intervalMs = parsePositiveInteger(
+    process.env.SELF_PING_INTERVAL_MS,
+    DEFAULT_SELF_PING_INTERVAL_MS
+  );
+  const timeoutMs = parsePositiveInteger(
+    process.env.SELF_PING_TIMEOUT_MS,
+    DEFAULT_SELF_PING_TIMEOUT_MS
+  );
+
+  let inFlight = false;
+  const runPing = async (): Promise<void> => {
+    if (inFlight) {
+      return;
+    }
+
+    inFlight = true;
+    const startedAt = Date.now();
+
+    try {
+      const response = await fetch(targetUrl, {
+        method: 'GET',
+        headers: { 'User-Agent': SELF_PING_USER_AGENT },
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+
+      const durationMs = Date.now() - startedAt;
+      if (!response.ok) {
+        logger.warn(
+          { targetUrl, status: response.status, durationMs },
+          'Self keepalive ping returned non-OK status'
+        );
+      } else {
+        logger.info({ targetUrl, status: response.status, durationMs }, 'Self keepalive ping success');
+      }
+    } catch (error: unknown) {
+      logger.warn({ err: error, targetUrl }, 'Self keepalive ping failed');
+    } finally {
+      inFlight = false;
+    }
+  };
+
+  setInterval(() => {
+    void runPing();
+  }, intervalMs);
+
+  logger.info({ targetUrl, intervalMs, timeoutMs }, 'Self keepalive ping loop enabled');
+}
+
 startHealthServer();
+startSelfKeepalivePingLoop();
 bootstrap().catch((err: unknown) => {
   logger.fatal({ err }, 'Failed to bootstrap mqtt-worker');
   process.exit(1);

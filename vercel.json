@@ -6,12 +6,6 @@
       "use": "@vercel/node"
     }
   ],
-  "crons": [
-    {
-      "path": "/api/cron/render-keepalive",
-      "schedule": "*/3 * * * *"
-    }
-  ],
   "routes": [
     {
       "src": "/api/cron/render-keepalive",
