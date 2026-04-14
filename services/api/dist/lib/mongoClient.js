@@ -9,24 +9,27 @@ const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const MONGODB_URI = process.env.MONGODB_URI || '';
 const MONGODB_DB = process.env.MONGODB_DB_NAME || 'hermit-home';
+const MONGODB_MAX_POOL_SIZE = Number.parseInt(process.env.MONGODB_MAX_POOL_SIZE || '10', 10);
 if (!MONGODB_URI) {
     throw new Error('Please define the MONGODB_URI environment variable');
 }
-/**
- * Global is used here to maintain a cached connection across hot reloads
- * in development and serverless function invocations in production.
- */
-let cachedClient = global.mongoClient || null;
-let cachedDb = global.mongoDb || null;
+const clientOptions = {
+    maxPoolSize: Number.isFinite(MONGODB_MAX_POOL_SIZE) ? MONGODB_MAX_POOL_SIZE : 10,
+    minPoolSize: 0,
+    serverSelectionTimeoutMS: 5000,
+};
+const globalMongo = globalThis;
+if (!globalMongo.mongoClientPromise) {
+    const client = new mongodb_1.MongoClient(MONGODB_URI, clientOptions);
+    globalMongo.mongoClientPromise = client.connect();
+}
 async function connectToDatabase() {
-    if (cachedClient && cachedDb) {
-        return { client: cachedClient, db: cachedDb };
+    if (globalMongo.mongoClient && globalMongo.mongoDb) {
+        return { client: globalMongo.mongoClient, db: globalMongo.mongoDb };
     }
-    const client = await mongodb_1.MongoClient.connect(MONGODB_URI);
+    const client = await globalMongo.mongoClientPromise;
     const db = client.db(MONGODB_DB);
-    cachedClient = client;
-    cachedDb = db;
-    global.mongoClient = client;
-    global.mongoDb = db;
+    globalMongo.mongoClient = client;
+    globalMongo.mongoDb = db;
     return { client, db };
 }

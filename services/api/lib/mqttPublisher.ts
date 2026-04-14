@@ -25,7 +25,7 @@ function buildMqttOptions(
   return options;
 }
 
-export async function publishCommand(userId: string, payload: CommandPayload): Promise<void> {
+export async function publishCommand(deviceId: string, payload: CommandPayload): Promise<void> {
   const host = process.env.MQTT_BROKER || '';
   const port = process.env.MQTT_PORT || '8883';
   const username = process.env.MQTT_USER || '';
@@ -48,7 +48,7 @@ export async function publishCommand(userId: string, payload: CommandPayload): P
     }, 5000);
 
     client.on('connect', () => {
-      const topic = `terrarium/commands/${userId}`;
+      const topic = `terrarium/commands/${deviceId}`;
       const message = JSON.stringify(payload);
 
       client.publish(topic, message, { qos: 1 }, (err) => {

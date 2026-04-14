@@ -14,7 +14,7 @@
         },
         {
           "key": "Access-Control-Allow-Headers",
-          "value": "Content-Type, Authorization, Accept"
+          "value": "Content-Type, Authorization, Accept, X-API-Key"
         },
         {
           "key": "Access-Control-Max-Age",

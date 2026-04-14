@@ -8,6 +8,7 @@ export default function handler(req: VercelRequest, res: VercelResponse): void {
 
   res.status(200).json({
     success: true,
-    message: 'Use /api/devices/{deviceId}/status or /api/devices/{deviceId}/override',
+    message:
+      'Use /api/devices/{deviceId}/status, /api/devices/{deviceId}/override, /api/devices/{deviceId}/control, or /api/devices/{deviceId}',
   });
 }

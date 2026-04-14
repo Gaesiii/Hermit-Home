@@ -1,111 +1,124 @@
 "use strict";
-// lib/authMiddleware.ts
-//
-// HOW IT WORKS
-// ─────────────────────────────────────────────────────────────────────────────
-// `withAuth` is a higher-order function (HOF) that wraps any Vercel handler.
-// On every invocation it:
-//   1. Pulls the raw JWT out of the Authorization header.
-//   2. Verifies the signature and expiry against JWT_SECRET.
-//   3. Casts the verified payload to JwtPayload and attaches it to the request
-//      as `req.user` so downstream handlers have typed access.
-//   4. Calls the original handler only if all the above succeeded.
-//
-// If anything goes wrong the HOF short-circuits with a 401 and the real
-// handler is never invoked.
-// ─────────────────────────────────────────────────────────────────────────────
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.verifyAuth = verifyAuth;
 exports.withAuth = withAuth;
-const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
-// ─── Environment validation ───────────────────────────────────────────────────
-//
-// Fail loudly at module load time rather than silently returning wrong 401s
-// at runtime. Vercel will surface this as a deployment-time error.
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-    throw new Error('[authMiddleware] Missing required environment variable: JWT_SECRET');
+const admin = __importStar(require("firebase-admin"));
+let firebaseInitialized = false;
+function readHeaderValue(value) {
+    if (typeof value === 'string') {
+        return value;
+    }
+    if (Array.isArray(value) && value.length > 0) {
+        return value[0];
+    }
+    return null;
 }
-// ─── Helper ───────────────────────────────────────────────────────────────────
-/**
- * Extracts the raw token string from an `Authorization: Bearer <token>` header.
- * Returns `null` for any header that is absent or does not start with "Bearer ".
- */
-function extractBearerToken(req) {
-    const header = req.headers.authorization;
-    // Must be a non-empty string that starts with exactly "Bearer " (7 chars).
-    if (!header || !header.startsWith('Bearer ')) {
+function ensureFirebaseInitialized() {
+    if (firebaseInitialized || admin.apps.length > 0) {
+        firebaseInitialized = true;
+        return;
+    }
+    const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+    if (!serviceAccountKey) {
+        throw new Error('[authMiddleware] FIREBASE_SERVICE_ACCOUNT_KEY is required for Bearer-token authentication.');
+    }
+    let serviceAccount;
+    try {
+        serviceAccount = JSON.parse(serviceAccountKey);
+    }
+    catch {
+        throw new Error('[authMiddleware] FIREBASE_SERVICE_ACCOUNT_KEY must be a valid JSON string.');
+    }
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+    });
+    firebaseInitialized = true;
+}
+async function verifyAuth(req, res) {
+    const providedApiKey = readHeaderValue(req.headers['x-api-key']);
+    const expectedApiKey = process.env.SERVICE_API_KEY || '';
+    if (providedApiKey) {
+        if (expectedApiKey && providedApiKey === expectedApiKey) {
+            const { deviceId } = req.query;
+            return typeof deviceId === 'string' ? deviceId : 'service-account';
+        }
+        res.status(401).json({
+            error: 'Unauthorized',
+            message: 'Invalid service API key.',
+        });
         return null;
     }
-    // Slice off the prefix and trim any accidental whitespace.
-    const token = header.slice(7).trim();
-    // Reject an empty string left behind after slicing (e.g. "Bearer   ").
-    return token.length > 0 ? token : null;
+    const authHeader = readHeaderValue(req.headers.authorization);
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        res.status(401).json({
+            error: 'Unauthorized',
+            message: 'Missing Authorization header. Expected: Bearer <token>',
+        });
+        return null;
+    }
+    const idToken = authHeader.slice('Bearer '.length).trim();
+    if (!idToken) {
+        res.status(401).json({
+            error: 'Unauthorized',
+            message: 'Bearer token is empty.',
+        });
+        return null;
+    }
+    try {
+        ensureFirebaseInitialized();
+        const decodedToken = await admin.auth().verifyIdToken(idToken);
+        return decodedToken.uid;
+    }
+    catch (error) {
+        const isExpired = error instanceof Error && error.message.toLowerCase().includes('expired');
+        res.status(401).json({
+            error: 'Unauthorized',
+            message: isExpired ? 'Token has expired.' : 'Invalid token.',
+        });
+        return null;
+    }
 }
-// ─── Core middleware ──────────────────────────────────────────────────────────
-/**
- * Higher-order function that wraps a Vercel handler with JWT authentication.
- *
- * Usage:
- * ```ts
- * export default withAuth(async (req, res) => {
- *   const { userId } = req.user; // fully typed
- *   res.status(200).json({ userId });
- * });
- * ```
- *
- * @param handler  The protected handler that receives an `AuthenticatedRequest`.
- * @returns        A standard Vercel handler that performs auth before delegating.
- */
 function withAuth(handler) {
     return async (req, res) => {
-        // ── Step 1: Extract token ────────────────────────────────────────────────
-        const token = extractBearerToken(req);
-        if (!token) {
-            res.status(401).json({
-                error: 'Authorization header is missing or malformed. Expected: Bearer <token>',
-            });
+        const userId = await verifyAuth(req, res);
+        if (userId === null) {
             return;
         }
-        // ── Step 2: Verify signature + expiry ────────────────────────────────────
-        let payload;
-        try {
-            // `jwt.verify` throws for an invalid signature, an expired token, or a
-            // malformed JWT structure — all of which should produce a 401.
-            payload = jsonwebtoken_1.default.verify(token, JWT_SECRET);
-        }
-        catch (err) {
-            // Distinguish the two most actionable error types for clearer client messages.
-            if (err instanceof jsonwebtoken_1.default.TokenExpiredError) {
-                res.status(401).json({ error: 'Token has expired. Please log in again.' });
-                return;
-            }
-            // Covers JsonWebTokenError (bad signature) and NotBeforeError.
-            res.status(401).json({ error: 'Token is invalid.' });
-            return;
-        }
-        // ── Step 3: Validate payload shape ───────────────────────────────────────
-        //
-        // `jwt.verify` only guarantees the signature is valid; it does NOT check
-        // that the payload has the fields our application expects. A token signed
-        // with the correct secret but with a different payload (e.g. an older
-        // schema) would otherwise pass silently and crash downstream handlers.
-        if (typeof payload.userId !== 'string' || payload.userId.trim() === '' ||
-            typeof payload.email !== 'string' || payload.email.trim() === '') {
-            res.status(401).json({
-                error: 'Token payload is malformed. Please log in again.',
-            });
-            return;
-        }
-        // ── Step 4: Inject user and delegate ────────────────────────────────────
-        //
-        // Cast req to AuthenticatedRequest and attach the verified payload.
-        // The cast is safe because we own the HOF — no other code path reaches
-        // the inner handler without first passing the checks above.
         const authenticatedReq = req;
-        authenticatedReq.user = payload;
+        authenticatedReq.user = { userId };
         await handler(authenticatedReq, res);
     };
 }

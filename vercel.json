@@ -8,6 +8,14 @@
   ],
   "routes": [
     {
+      "src": "/api/users/login",
+      "dest": "/services/api/api/users/login.ts"
+    },
+    {
+      "src": "/api/users/register",
+      "dest": "/services/api/api/users/register.ts"
+    },
+    {
       "src": "/api/devices/([^/]+)/status",
       "dest": "/services/api/api/devices/[deviceId]/status.ts"
     },
@@ -16,8 +24,16 @@
       "dest": "/services/api/api/devices/[deviceId]/override.ts"
     },
     {
+      "src": "/api/devices/([^/]+)/control",
+      "dest": "/services/api/api/devices/[deviceId]/control.ts"
+    },
+    {
       "src": "/api/devices/schedules",
       "dest": "/services/api/api/devices/schedules/index.ts"
+    },
+    {
+      "src": "/api/devices/([^/]+)",
+      "dest": "/services/api/api/devices/[deviceId]/index.ts"
     },
     {
       "src": "/api/devices",
