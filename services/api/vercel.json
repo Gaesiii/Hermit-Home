@@ -1,5 +1,11 @@
 {
   "version": 2,
+  "crons": [
+    {
+      "path": "/api/cron/render-keepalive",
+      "schedule": "*/3 * * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",
