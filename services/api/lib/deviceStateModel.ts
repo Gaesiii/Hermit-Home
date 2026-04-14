@@ -16,6 +16,7 @@
 
 import { Collection, ObjectId } from 'mongodb';
 import { connectToDatabase } from './mongoClient';
+import { sanitizeRelayMap } from './mistSafety';
 
 // ─── Device vocabulary ────────────────────────────────────────────────────────
 //
@@ -130,7 +131,7 @@ export async function insertDeviceState(
   const document: DeviceStateDocument = {
     deviceId,
     userId,
-    state,
+    state: sanitizeRelayMap(state),
     source,
     createdAt: new Date(), // server-side timestamp — never from client body
   };
@@ -164,7 +165,7 @@ export async function getRecentDeviceStates(
   // memory or response timeout.
   const safeLimit = Math.min(Math.max(1, limit), 100);
 
-  return collection
+  const history = await collection
     .find({
       deviceId,
       // Scope results strictly to the calling user. A user must not be able
@@ -174,4 +175,9 @@ export async function getRecentDeviceStates(
     .sort({ createdAt: -1 }) // newest first — matches dashboard scroll direction
     .limit(safeLimit)
     .toArray();
+
+  return history.map((document) => ({
+    ...document,
+    state: sanitizeRelayMap(document.state),
+  }));
 }

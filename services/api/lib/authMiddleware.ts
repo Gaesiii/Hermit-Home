@@ -1,5 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import * as admin from 'firebase-admin';
+import jwt from 'jsonwebtoken';
 
 let firebaseInitialized = false;
 
@@ -54,6 +55,21 @@ function ensureFirebaseInitialized(): void {
   firebaseInitialized = true;
 }
 
+function verifyInternalJwtToken(token: string): string | null {
+  const jwtSecret = process.env.JWT_SECRET || '';
+  if (!jwtSecret) {
+    return null;
+  }
+
+  const decoded = jwt.verify(token, jwtSecret) as jwt.JwtPayload | string;
+  if (typeof decoded !== 'object' || decoded === null) {
+    return null;
+  }
+
+  const userId = decoded.userId;
+  return typeof userId === 'string' && userId.trim().length > 0 ? userId : null;
+}
+
 export async function verifyAuth(
   req: VercelRequest,
   res: VercelResponse
@@ -92,10 +108,22 @@ export async function verifyAuth(
     return null;
   }
 
+  let firebaseError: unknown = null;
   try {
-    ensureFirebaseInitialized();
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
-    return decodedToken.uid;
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+      ensureFirebaseInitialized();
+      const decodedToken = await admin.auth().verifyIdToken(idToken);
+      return decodedToken.uid;
+    }
+  } catch (error: unknown) {
+    firebaseError = error;
+  }
+
+  try {
+    const internalUserId = verifyInternalJwtToken(idToken);
+    if (internalUserId) {
+      return internalUserId;
+    }
   } catch (error: unknown) {
     const isExpired =
       error instanceof Error && error.message.toLowerCase().includes('expired');
@@ -106,6 +134,16 @@ export async function verifyAuth(
     });
     return null;
   }
+
+  const firebaseTokenExpired =
+    firebaseError instanceof Error &&
+    firebaseError.message.toLowerCase().includes('expired');
+
+  res.status(401).json({
+    error: 'Unauthorized',
+    message: firebaseTokenExpired ? 'Token has expired.' : 'Invalid token.',
+  });
+  return null;
 }
 
 export function withAuth(handler: AuthenticatedHandler) {
@@ -118,5 +156,5 @@ export function withAuth(handler: AuthenticatedHandler) {
     const authenticatedReq = req as AuthenticatedRequest;
     authenticatedReq.user = { userId };
     await handler(authenticatedReq, res);
-  };
+  }
 }

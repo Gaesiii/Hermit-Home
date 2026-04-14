@@ -79,7 +79,7 @@ void PriorityController::_applyDeviceOverride(JsonObjectConst devicesObj) {
                       _relays.heater ? "ON" : "OFF");
     }
     if (devicesObj["mist"].is<bool>()) {
-        _relays.mist = devicesObj["mist"].as<bool>();
+        _relays.mist = MIST_SAFETY_LOCK ? false : devicesObj["mist"].as<bool>();
         Serial.printf("[Priority]   mist   → %s\n",
                       _relays.mist ? "ON" : "OFF");
     }

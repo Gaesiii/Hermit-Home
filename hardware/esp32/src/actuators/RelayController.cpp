@@ -37,7 +37,11 @@ void RelayController::init() {
 // ----------------------------------------------------------------
 void RelayController::applyAll(const RelayState& state) {
     RELAY_SET(PIN_HEATER, state.heater);
+#if MIST_SAFETY_LOCK
+    RELAY_SET(PIN_MIST,   false);
+#else
     RELAY_SET(PIN_MIST,   state.mist);
+#endif
     RELAY_SET(PIN_FAN,    state.fan);
     RELAY_SET(PIN_LIGHT,  state.light);
 }
@@ -52,7 +56,11 @@ void RelayController::setHeater(bool on) {
 }
 
 void RelayController::setMist(bool on) {
+#if MIST_SAFETY_LOCK
+    RELAY_SET(PIN_MIST, false);
+#else
     RELAY_SET(PIN_MIST, on);
+#endif
 }
 
 void RelayController::setFan(bool on) {

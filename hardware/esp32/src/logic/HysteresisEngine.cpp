@@ -24,8 +24,12 @@ void HysteresisEngine::evaluate(float temperature,
     // Inside dead-band [tempMin, tempMax] → preserve last state.
 
     // ---- Mist (humidity control) --------------------------------
+#if MIST_SAFETY_LOCK
+    relays.mist = false;
+#else
     if      (humidity < config.humMin) relays.mist = true;
     else if (humidity > config.humMax) relays.mist = false;
+#endif
 
     // ---- Light (lux control) ------------------------------------
     if      (lux < config.luxMin) relays.light = true;

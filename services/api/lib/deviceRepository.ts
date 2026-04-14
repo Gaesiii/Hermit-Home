@@ -1,5 +1,6 @@
 import { Db } from 'mongodb';
 import { DeviceMode, DeviceStatePatch, DeviceStateRecord, RelayState } from '@smart-terrarium/shared-types';
+import { sanitizeRelayMap } from './mistSafety';
 
 const COLLECTION_NAME = 'devices';
 
@@ -36,7 +37,7 @@ function mapDeviceDocument(doc: DeviceDocument): DeviceStateRecord {
     user_override: doc.user_override ?? false,
     relays: {
       ...DEFAULT_RELAYS,
-      ...doc.relays
+      ...sanitizeRelayMap(doc.relays)
     },
     lastTelemetryAt: toIsoString(doc.lastTelemetryAt),
     lastCommandAt: toIsoString(doc.lastCommandAt),
@@ -80,7 +81,7 @@ export async function patchDeviceById(
   if (patch.relays) {
     update.relays = {
       ...DEFAULT_RELAYS,
-      ...patch.relays
+      ...sanitizeRelayMap(patch.relays)
     };
   }
 
@@ -94,7 +95,7 @@ export async function patchDeviceById(
         user_override: patch.user_override ?? false,
         relays: {
           ...DEFAULT_RELAYS,
-          ...patch.relays
+          ...sanitizeRelayMap(patch.relays)
         },
         lastTelemetryAt: null,
         lastCommandAt: null
@@ -135,7 +136,7 @@ export async function markCommandSent(
   if (patch.relays) {
     update.relays = {
       ...DEFAULT_RELAYS,
-      ...patch.relays
+      ...sanitizeRelayMap(patch.relays)
     };
   }
 

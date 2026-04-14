@@ -2,6 +2,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { publishCommand } from '../../../lib/mqttPublisher';
 import { CommandPayload } from '@smart-terrarium/shared-types';
 import { verifyAuth } from '../../../lib/authMiddleware';
+import { MIST_SAFETY_LOCK_ENABLED, sanitizeCommandPayload } from '../../../lib/mistSafety';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).end();
@@ -17,6 +18,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { deviceId } = req.query;
   const command = req.body as CommandPayload;
+
+  if (!command || typeof command !== 'object' || Array.isArray(command)) {
+    return res.status(400).json({ error: 'Request body must be a JSON object' });
+  }
+
+  const safeCommand = sanitizeCommandPayload(command);
+  const requestedMistOn = command?.devices?.mist === true;
 
   if (!deviceId || typeof deviceId !== 'string') {
     return res.status(400).json({ error: 'Device ID is required' });
@@ -36,12 +44,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    await publishCommand(deviceId, command);
+    await publishCommand(deviceId, safeCommand);
 
     return res.status(200).json({
       success: true,
       device: deviceId,
       message: 'Override command sent',
+      mist_locked_off: MIST_SAFETY_LOCK_ENABLED && requestedMistOn,
     });
   } catch (error) {
     console.error('MQTT Error:', error);

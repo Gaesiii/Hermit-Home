@@ -9,6 +9,7 @@ import {
   isDeviceKey,
 } from '../../../lib/deviceStateModel';
 import { publishCommand } from '../../../lib/mqttPublisher';
+import { MIST_SAFETY_LOCK_ENABLED, sanitizeRelayMap } from '../../../lib/mistSafety';
 
 const OBJECT_ID_REGEX = /^[a-f\d]{24}$/i;
 
@@ -112,9 +113,12 @@ async function handlePost(
     stateUpdate[key] = value;
   }
 
+  const requestedMistOn = stateUpdate.mist === true;
+  const safeStateUpdate = sanitizeRelayMap(stateUpdate);
+
   const commandPayload: CommandPayload = {
     user_override: true,
-    devices: stateUpdate,
+    devices: safeStateUpdate,
   };
 
   try {
@@ -128,20 +132,22 @@ async function handlePost(
   }
 
   try {
-    const recordId = await insertDeviceState(deviceId, req.user.userId, stateUpdate, 'user');
+    const recordId = await insertDeviceState(deviceId, req.user.userId, safeStateUpdate, 'user');
     res.status(200).json({
       success: true,
       deviceId,
-      appliedState: stateUpdate,
+      appliedState: safeStateUpdate,
       recordId,
+      mist_locked_off: MIST_SAFETY_LOCK_ENABLED && requestedMistOn,
     });
   } catch (error: unknown) {
     console.error('[POST /api/devices/[deviceId]/control] MongoDB insert failed', error);
     res.status(207).json({
       success: true,
       deviceId,
-      appliedState: stateUpdate,
+      appliedState: safeStateUpdate,
       warning: 'Command was sent to the device but could not be recorded in the database.',
+      mist_locked_off: MIST_SAFETY_LOCK_ENABLED && requestedMistOn,
     });
   }
 }

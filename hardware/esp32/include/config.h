@@ -24,6 +24,10 @@
 #define PIN_LIGHT       17    // IN3 — Đèn chiếu sáng
 #define PIN_FAN         18    // IN4 — Quạt thông gió
 
+// Temporary lock for broken mist hardware.
+// Set to false after replacing the mist module/sensor.
+#define MIST_SAFETY_LOCK true
+
 // Macro điều khiển relay — Active-HIGH
 #define RELAY_ON(pin)         digitalWrite(pin, HIGH)
 #define RELAY_OFF(pin)        digitalWrite(pin, LOW)

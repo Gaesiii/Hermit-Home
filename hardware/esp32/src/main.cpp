@@ -48,6 +48,12 @@ bool g_mqttWasConnected = false;
 uint32_t t_lastSensor   = 0;
 uint32_t t_lastPublish  = 0;
 
+static inline void enforceMistSafetyLock() {
+#if MIST_SAFETY_LOCK
+    g_relayState.mist = false;
+#endif
+}
+
 // ================================================================
 //  MQTT CALLBACK
 // ================================================================
@@ -59,7 +65,9 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     if (!error) {
         // 1. Dispatch the payload to the Priority logic
         priority.parseMqttCommand(doc);
-        
+
+        enforceMistSafetyLock();
+
         // 2. Immediately enforce any relay state changes 
         // (e.g., instant User Overrides)
         relays.applyAll(g_relayState);
@@ -137,6 +145,7 @@ void loop() {
         // FAIL-SAFE: If DHT22 returns NaN, cut critical actuators
         if (sensors.isSensorFault()) {
             relays.emergencyShutdownHeatMist();
+            g_relayState.mist = false;
         } 
         else {
             // NORMAL OPERATION: If User is NOT overriding, let AI/Local config rule
@@ -149,6 +158,7 @@ void loop() {
                     g_relayState
                 );
             }
+            enforceMistSafetyLock();
             // Apply the evaluated or overridden states to the physical GPIOs
             relays.applyAll(g_relayState);
         }
@@ -161,6 +171,7 @@ void loop() {
         t_lastPublish = now;
 
         if (mqtt.isConnected()) {
+            enforceMistSafetyLock();
             mqtt.publishTelemetry(
                 sensors.getTemperature(),
                 sensors.getHumidity(),

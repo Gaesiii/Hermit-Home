@@ -3,6 +3,7 @@ import { DeviceStatePatch } from '@smart-terrarium/shared-types';
 import { connectToDatabase } from '../../../lib/mongoClient';
 import { getDeviceById, patchDeviceById } from '../../../lib/deviceRepository';
 import { verifyAuth } from '../../../lib/authMiddleware';
+import { sanitizeDeviceStatePatch } from '../../../lib/mistSafety';
 
 const OBJECT_ID_REGEX = /^[a-f\d]{24}$/i;
 
@@ -44,7 +45,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json(device);
     }
 
-    const patch = req.body as DeviceStatePatch;
+    const patch = sanitizeDeviceStatePatch(req.body as DeviceStatePatch);
     const updated = await patchDeviceById(db, deviceId, patch);
     return res.status(200).json(updated);
   } catch (error: unknown) {

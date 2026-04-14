@@ -1,6 +1,7 @@
 import mqtt, { IClientOptions } from 'mqtt';
 import { CommandPayload } from '@smart-terrarium/shared-types';
 import dotenv from 'dotenv';
+import { sanitizeCommandPayload } from './mistSafety';
 
 dotenv.config();
 
@@ -49,7 +50,7 @@ export async function publishCommand(deviceId: string, payload: CommandPayload):
 
     client.on('connect', () => {
       const topic = `terrarium/commands/${deviceId}`;
-      const message = JSON.stringify(payload);
+      const message = JSON.stringify(sanitizeCommandPayload(payload));
 
       client.publish(topic, message, { qos: 1 }, (err) => {
         clearTimeout(timeout);
