@@ -29,7 +29,7 @@ class TelemetryRepository {
     ).timeout(AppConstants.requestTimeout);
 
     if (response.statusCode != 200) {
-      throw Exception(_extractError(response.body, response.statusCode));
+      throw Exception(_extractError(response.body, response.statusCode, uri));
     }
 
     final decoded = jsonDecode(response.body);
@@ -48,7 +48,7 @@ class TelemetryRepository {
         .toList(growable: false);
   }
 
-  String _extractError(String body, int statusCode) {
+  String _extractError(String body, int statusCode, Uri uri) {
     try {
       final decoded = jsonDecode(body);
       if (decoded is Map<String, dynamic>) {
@@ -61,6 +61,14 @@ class TelemetryRepository {
       // Ignore malformed JSON body and fallback to generic message.
     }
 
-    return 'Telemetry request failed (HTTP $statusCode).';
+    final compactBody = body.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (compactBody.isNotEmpty) {
+      final preview = compactBody.length > 160
+          ? '${compactBody.substring(0, 160)}...'
+          : compactBody;
+      return 'Telemetry request failed (HTTP $statusCode) at $uri: $preview';
+    }
+
+    return 'Telemetry request failed (HTTP $statusCode) at $uri.';
   }
 }
