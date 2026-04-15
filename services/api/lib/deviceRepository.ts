@@ -85,21 +85,29 @@ export async function patchDeviceById(
     };
   }
 
+  const setOnInsert: Record<string, unknown> = {
+    deviceId,
+    lastTelemetryAt: null,
+    lastCommandAt: null
+  };
+
+  if (!('mode' in update)) {
+    setOnInsert.mode = 'AUTO';
+  }
+
+  if (!('user_override' in update)) {
+    setOnInsert.user_override = false;
+  }
+
+  if (!('relays' in update)) {
+    setOnInsert.relays = { ...DEFAULT_RELAYS };
+  }
+
   const result = await db.collection<DeviceDocument>(COLLECTION_NAME).findOneAndUpdate(
     { deviceId },
     {
       $set: update,
-      $setOnInsert: {
-        deviceId,
-        mode: patch.mode ?? 'AUTO',
-        user_override: patch.user_override ?? false,
-        relays: {
-          ...DEFAULT_RELAYS,
-          ...sanitizeRelayMap(patch.relays)
-        },
-        lastTelemetryAt: null,
-        lastCommandAt: null
-      }
+      $setOnInsert: setOnInsert
     },
     {
       upsert: true,
