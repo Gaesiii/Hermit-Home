@@ -411,18 +411,58 @@ class UserApiTestService {
       }
 
       String? email;
+      String? userId;
+      String? createdAt;
       final user = decoded['user'];
       if (user is Map<String, dynamic>) {
         final userEmail = user['email'];
         if (userEmail is String && userEmail.isNotEmpty) {
           email = userEmail;
         }
+
+        final idValue = user['_id'];
+        if (idValue is String && idValue.isNotEmpty) {
+          userId = idValue;
+        }
+
+        final createdAtValue = user['createdAt'];
+        if (createdAtValue is String && createdAtValue.isNotEmpty) {
+          createdAt = createdAtValue;
+        }
       }
 
-      await _storage.write(key: AppConstants.tokenKey, value: token);
+      final operations = <Future<void>>[
+        _storage.write(key: AppConstants.tokenKey, value: token),
+        _storage.write(
+          key: AppConstants.lastLoginAtKey,
+          value: DateTime.now().toUtc().toIso8601String(),
+        ),
+      ];
+
       if (email != null) {
-        await _storage.write(key: AppConstants.emailKey, value: email);
+        operations
+            .add(_storage.write(key: AppConstants.emailKey, value: email));
+      } else {
+        operations.add(_storage.delete(key: AppConstants.emailKey));
       }
+
+      if (userId != null) {
+        operations
+            .add(_storage.write(key: AppConstants.userIdKey, value: userId));
+      } else {
+        operations.add(_storage.delete(key: AppConstants.userIdKey));
+      }
+
+      if (createdAt != null) {
+        operations.add(
+          _storage.write(
+              key: AppConstants.accountCreatedAtKey, value: createdAt),
+        );
+      } else {
+        operations.add(_storage.delete(key: AppConstants.accountCreatedAtKey));
+      }
+
+      await Future.wait(operations);
     } catch (_) {
       return;
     }
@@ -432,6 +472,9 @@ class UserApiTestService {
     await Future.wait([
       _storage.delete(key: AppConstants.tokenKey),
       _storage.delete(key: AppConstants.emailKey),
+      _storage.delete(key: AppConstants.userIdKey),
+      _storage.delete(key: AppConstants.accountCreatedAtKey),
+      _storage.delete(key: AppConstants.lastLoginAtKey),
     ]);
   }
 
