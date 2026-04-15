@@ -52,6 +52,7 @@ Tier 3 — Local Failsafe: on-device safety control when cloud is unavailable
 🏗️ System Architecture
 
 <div align="center">
+
          ┌────────────────────┐
          │   Flutter Mobile   │
          │       App          │
@@ -81,6 +82,7 @@ Tier 3 — Local Failsafe: on-device safety control when cloud is unavailable
            ┌──────────────┐
            │    ESP32     │
            └──────────────┘
+
 </div>
 
 ✨ Key Features
