@@ -204,7 +204,7 @@ AI chat-style interaction
 User authentication
 ```
 🛣️ Roadmap
-```
+
  ESP32 telemetry publishing
  MQTT worker persistence
  REST API control endpoints
@@ -214,7 +214,7 @@ User authentication
  Device onboarding flow
  Multi-device support
  Analytics dashboard
-```
+
 📖 Expand for More Details
 
 <details> <summary><b>Sense → Think → Act Flow</b></summary>
