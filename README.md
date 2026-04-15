@@ -33,7 +33,7 @@ It combines:
 
 ## 🎯 Tiered Priority Control
 
-<div align="center">
+<!-- <div align="center"> -->
 
 ```text
 User Override
@@ -42,7 +42,7 @@ AI Agent
    ↓
 Local Failsafe (ESP32)
 ```
-</div>
+<!-- </div> -->
 
 This system follows a tiered control architecture:
 
