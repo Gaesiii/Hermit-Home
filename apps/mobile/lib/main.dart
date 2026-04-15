@@ -5,8 +5,8 @@ import 'core/services/auth_service.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/auth_routes.dart';
 import 'features/auth/presentation/login_screen.dart';
-import 'features/auth/presentation/register_screen.dart';
 import 'features/auth/presentation/user_api_test_screen.dart';
+// Lưu ý kiểm tra lại đường dẫn import này cho đúng với cấu trúc thư mục của Tộc Trưởng:
 import 'features/dashboard/dashboard_screen.dart';
 
 Future<void> main() async {
@@ -30,10 +30,13 @@ class HermitHomeApp extends StatelessWidget {
       theme: AppTheme.themeData,
       home: const _LaunchGate(),
       routes: {
-        AuthRoutes.login: (_) => const LoginScreen(),
-        AuthRoutes.register: (_) => const RegisterScreen(),
-        AuthRoutes.home: (_) => const DashboardScreen(),
-        AuthRoutes.dashboard: (_) => const DashboardScreen(),
+        // Đã GỠ BỎ chữ 'const' ở phía trước các màn hình để tránh lỗi
+        '/login': (_) => LoginScreen(),
+        '/dashboard': (_) => DashboardScreen(),
+
+        AuthRoutes.login: (_) => LoginScreen(),
+        AuthRoutes.home: (_) => DashboardScreen(),
+        AuthRoutes.dashboard: (_) => DashboardScreen(),
         AuthRoutes.apiTest: (_) => const UserApiTestScreen(),
       },
     );
@@ -63,12 +66,16 @@ class _LaunchGateState extends State<_LaunchGate> {
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+            backgroundColor: Color(0xFF000B18),
+            body: Center(
+              child: CircularProgressIndicator(color: Color(0xFF00D2FF)),
+            ),
           );
         }
 
         final isLoggedIn = snapshot.data ?? false;
-        return isLoggedIn ? const DashboardScreen() : const LoginScreen();
+        // Đã GỠ BỎ chữ 'const' ở đây luôn
+        return isLoggedIn ? DashboardScreen() : LoginScreen();
       },
     );
   }

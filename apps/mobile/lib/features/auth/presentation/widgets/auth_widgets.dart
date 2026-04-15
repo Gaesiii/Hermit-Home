@@ -1,6 +1,5 @@
+// lib/features/auth/presentation/widgets/auth_widgets.dart
 import 'package:flutter/material.dart';
-
-import '../../../../../core/theme/app_theme.dart';
 
 class AuthScreenBackground extends StatelessWidget {
   const AuthScreenBackground({super.key, required this.child});
@@ -12,178 +11,82 @@ class AuthScreenBackground extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF0D1915),
-            Color(0xFF121F1A),
-            Color(0xFF182820),
-          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF0A3D62), Color(0xFF90CAF9)],
         ),
       ),
-      child: Stack(
-        children: [
-          Positioned(
-            top: -120,
-            right: -40,
-            child: _GlowOrb(
-              size: 260,
-              color: AppTheme.primary.withValues(alpha: 0.14),
-            ),
-          ),
-          Positioned(
-            bottom: -110,
-            left: -30,
-            child: _GlowOrb(
-              size: 230,
-              color: AppTheme.accent.withValues(alpha: 0.10),
-            ),
-          ),
-          child,
-        ],
-      ),
+      child: child,
     );
   }
 }
 
-class _GlowOrb extends StatelessWidget {
-  const _GlowOrb({required this.size, required this.color});
-
-  final double size;
-  final Color color;
+class HermitShellLogo extends StatelessWidget {
+  const HermitShellLogo({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-    );
+    return const Text('🐚', style: TextStyle(fontSize: 80));
   }
 }
 
-class EmailField extends StatelessWidget {
-  const EmailField({
+// ==================== GLASS TEXTFIELD (ĐÃ SỬA ĐẦY ĐỦ) ====================
+class GlassTextField extends StatelessWidget {
+  const GlassTextField({
     super.key,
     required this.controller,
     this.focusNode,
     this.nextFocusNode,
-    this.enabled = true,
-    this.label = 'Email',
-    this.hint = 'you@example.com',
+    required this.label,
+    this.hint = '',
+    this.obscureText = false,
+    this.onSubmitted,
   });
 
   final TextEditingController controller;
   final FocusNode? focusNode;
   final FocusNode? nextFocusNode;
-  final bool enabled;
   final String label;
   final String hint;
+  final bool obscureText;
+  final VoidCallback? onSubmitted;
 
   @override
   Widget build(BuildContext context) {
     return TextFormField(
       controller: controller,
       focusNode: focusNode,
-      enabled: enabled,
-      keyboardType: TextInputType.emailAddress,
-      textInputAction: TextInputAction.next,
-      autocorrect: false,
-      onFieldSubmitted: (_) => nextFocusNode?.requestFocus(),
+      obscureText: obscureText,
+      textInputAction:
+          nextFocusNode != null ? TextInputAction.next : TextInputAction.done,
+      onFieldSubmitted: (_) => onSubmitted?.call(),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        prefixIcon: const Icon(Icons.mail_outline_rounded),
-      ),
-      validator: (value) {
-        final email = value?.trim() ?? '';
-        if (email.isEmpty) {
-          return 'Email is required.';
-        }
-
-        final emailRe = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
-        if (!emailRe.hasMatch(email)) {
-          return 'Enter a valid email address.';
-        }
-
-        return null;
-      },
-    );
-  }
-}
-
-class PasswordField extends StatefulWidget {
-  const PasswordField({
-    super.key,
-    required this.controller,
-    this.focusNode,
-    this.nextFocusNode,
-    this.label = 'Password',
-    this.hint = 'At least 8 characters',
-    this.enabled = true,
-    this.extraValidator,
-    this.onSubmitted,
-    this.textInputAction,
-  });
-
-  final TextEditingController controller;
-  final FocusNode? focusNode;
-  final FocusNode? nextFocusNode;
-  final String label;
-  final String hint;
-  final bool enabled;
-  final String? Function(String?)? extraValidator;
-  final VoidCallback? onSubmitted;
-  final TextInputAction? textInputAction;
-
-  @override
-  State<PasswordField> createState() => _PasswordFieldState();
-}
-
-class _PasswordFieldState extends State<PasswordField> {
-  bool _obscure = true;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextFormField(
-      controller: widget.controller,
-      focusNode: widget.focusNode,
-      enabled: widget.enabled,
-      obscureText: _obscure,
-      textInputAction: widget.textInputAction ??
-          (widget.onSubmitted != null
-              ? TextInputAction.done
-              : TextInputAction.next),
-      onFieldSubmitted: (_) {
-        if (widget.onSubmitted != null) {
-          widget.onSubmitted!.call();
-          return;
-        }
-        widget.nextFocusNode?.requestFocus();
-      },
-      decoration: InputDecoration(
-        labelText: widget.label,
-        hintText: widget.hint,
-        prefixIcon: const Icon(Icons.lock_outline_rounded),
-        suffixIcon: IconButton(
-          onPressed: () => setState(() => _obscure = !_obscure),
-          icon: Icon(
-            _obscure
-                ? Icons.visibility_outlined
-                : Icons.visibility_off_outlined,
-          ),
-          tooltip: _obscure ? 'Show password' : 'Hide password',
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.85),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
         ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.7)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFF42A5F5), width: 2),
+        ),
+        contentPadding:
+            const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
       ),
+      style: const TextStyle(fontSize: 16.5, color: Colors.black87),
       validator: (value) {
-        final password = value ?? '';
-        if (password.isEmpty) {
-          return 'Password is required.';
+        if (value == null || value.isEmpty) return '$label không được để trống';
+        if (label.contains('Mật khẩu') && value.length < 8) {
+          return 'Mật khẩu phải có ít nhất 8 ký tự';
         }
-        if (password.length < 8) {
-          return 'Password must be at least 8 characters.';
-        }
-        return widget.extraValidator?.call(value);
+        return null;
       },
     );
   }
@@ -195,37 +98,24 @@ class AuthSubmitButton extends StatelessWidget {
     required this.label,
     required this.isLoading,
     required this.onPressed,
-    this.icon,
   });
 
   final String label;
   final bool isLoading;
   final VoidCallback? onPressed;
-  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
     return ElevatedButton(
       onPressed: isLoading ? null : onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.blue,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
       child: isLoading
-          ? const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.3,
-                color: Colors.black,
-              ),
-            )
-          : Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (icon != null) ...[
-                  Icon(icon, size: 18),
-                  const SizedBox(width: 8),
-                ],
-                Text(label),
-              ],
-            ),
+          ? const CircularProgressIndicator(color: Colors.white)
+          : Text(label, style: const TextStyle(fontSize: 16)),
     );
   }
 }
