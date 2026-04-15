@@ -17,7 +17,7 @@
 
 ---
 
-## 🦀 About The Project
+## About The Project
 
 **Smart Terrarium — Hermit Home** is an intelligent, event-driven IoT ecosystem designed to monitor and autonomously control a hermit crab habitat.
 
@@ -31,7 +31,7 @@ It combines:
 
 ---
 
-## 🎯 Tiered Priority Control
+## Tiered Priority Control
 
 
 ```
@@ -49,7 +49,7 @@ Tier 1 — User: highest priority manual override
 Tier 2 — AI Agent: autonomous optimization logic
 Tier 3 — Local Failsafe: on-device safety control when cloud is unavailable
 ```
-🏗️ System Architecture
+System Architecture
 
 <!-- <div align="center"> -->
 
@@ -85,16 +85,16 @@ Tier 3 — Local Failsafe: on-device safety control when cloud is unavailable
 
 <!-- </div> -->
 
-✨ Key Features
+Key Features
 ```
-🌡️ Real-time environmental monitoring
-💧 Automated mist, fan, light, and heater control
-🤖 AI-assisted habitat optimization
-📡 MQTT-based telemetry pipeline
-☁️ Cloud-connected control with local fallback logic
-📱 Mobile app integration for live monitoring and overrides
+Real-time environmental monitoring
+Automated mist, fan, light, and heater control
+AI-assisted habitat optimization
+MQTT-based telemetry pipeline
+Cloud-connected control with local fallback logic
+Mobile app integration for live monitoring and overrides
 ```
-🧩 Tech Stack
+Tech Stack
 <!-- <div align="center"> -->
 ```
 Layer	Technology
@@ -107,7 +107,7 @@ Mobile	Flutter
 ```
 <!-- </div> -->
 
-📂 Monorepo Structure
+Monorepo Structure
 ```
 smart-terrarium/
 ├── hardware/esp32/            # PlatformIO project for ESP32 firmware
@@ -119,7 +119,7 @@ smart-terrarium/
 ├── apps/mobile/               # Flutter mobile application
 └── infra/                     # Docker / infra config
 ```
-🚀 Getting Started
+Getting Started
 
 1. Clone the repository
 git clone https://github.com/your-username/smart-terrarium.git
@@ -131,7 +131,7 @@ cd packages/shared-types
 npm run build
 cd ../..
 
-🔐 Environment Variables
+Environment Variables
 ```
 services/api/.env and services/mqtt-worker/.env
 MONGODB_URI="mongodb+srv://<user>:<password>@cluster.mongodb.net/?retryWrites=true&w=majority"
@@ -144,7 +144,7 @@ services/ai-agent/.env
 API_BASE_URL="http://localhost:3000"
 DEVICE_ID="<your_device_id_from_mongodb>"
 ```
-🏃 Running Locally
+Running Locally
 ```
 Terminal 1 — REST API
 cd services/api
@@ -159,7 +159,7 @@ python -m venv venv
 pip install -r requirements.txt
 python src/main.py
 ```
-📡 API Endpoints
+API Endpoints
 ```
 Get device status
 GET /api/devices/{deviceId}/status
@@ -176,7 +176,7 @@ Auth endpoints
 POST /api/users/forgot-password
 POST /api/users/reset-password
 ```
-🔌 Hardware Responsibilities
+Hardware Responsibilities
 ```
 Read sensors:
    DHT22
@@ -190,14 +190,14 @@ Control relays for:
    Light
    Heater
 ```
-🤖 AI Agent Responsibilities
+AI Agent Responsibilities
 ```
 Poll current terrarium state from API
 Evaluate environmental conditions
 Trigger device actions when needed
 Act as Tier-2 autonomous controller
 ```
-📱 Mobile App
+Mobile App
 ```
 Planned mobile app features:
    Real-time telemetry monitoring
@@ -206,7 +206,7 @@ Planned mobile app features:
    AI chat-style interaction
    User authentication
 ```
-🛣️ Roadmap
+Roadmap
 ```
  ESP32 telemetry publishing
  MQTT worker persistence
@@ -218,7 +218,7 @@ Planned mobile app features:
  Multi-device support
  Analytics dashboard
 ```
-📖 Expand for More Details
+Expand for More Details
 
 <details> <summary><b>Sense → Think → Act Flow</b></summary>
 Sense
@@ -239,8 +239,8 @@ AI only acts when manual override is not active
 ESP32 local failsafe protects habitat when network/cloud is unavailable
 </details>
 
-👨‍💻 Author
+Author
 
 Built with passion for IoT, automation, and intelligent habitat systems.
 
-<div align="center"> <img width="100%" src="https://capsule-render.vercel.app/api?type=waving&section=footer&height=120" /> </div> ```
+<div align="center"> <img width="100%" src="https://capsule-render.vercel.app/api?type=waving&section=footer&height=120" /> </div>
