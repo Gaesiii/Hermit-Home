@@ -31,8 +31,20 @@
   ],
   "routes": [
     {
+      "src": "/reset-password",
+      "dest": "/services/api/public/reset-password.html"
+    },
+    {
+      "src": "/reset-password/",
+      "dest": "/services/api/public/reset-password.html"
+    },
+    {
       "src": "/api/users/forgot-password",
       "dest": "/services/api/api/users/forgot-password.ts"
+    },
+    {
+      "src": "/api/users/validate-reset-token",
+      "dest": "/services/api/api/users/reset-password.ts"
     },
     {
       "src": "/api/users/reset-password",
