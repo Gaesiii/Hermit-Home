@@ -31,10 +31,6 @@
   ],
   "routes": [
     {
-      "src": "/api/cron/render-keepalive",
-      "dest": "/services/api/api/cron/render-keepalive.ts"
-    },
-    {
       "src": "/api/users/login",
       "dest": "/services/api/api/users/login.ts"
     },
