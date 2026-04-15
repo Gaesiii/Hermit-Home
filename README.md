@@ -44,10 +44,11 @@ Local Failsafe (ESP32)
 <!-- </div> -->
 
 This system follows a tiered control architecture:
-
+```
 Tier 1 — User: highest priority manual override
 Tier 2 — AI Agent: autonomous optimization logic
 Tier 3 — Local Failsafe: on-device safety control when cloud is unavailable
+```
 🏗️ System Architecture
 
 <!-- <div align="center"> -->
@@ -178,15 +179,16 @@ POST /api/users/reset-password
 🔌 Hardware Responsibilities
 ```
 Read sensors:
-DHT22
-BH1750
-Soil Moisture
-Execute local hysteresis / failsafe logic
+   DHT22
+   BH1750
+   Soil Moisture
+   Execute local hysteresis / failsafe logic
+
 Control relays for:
-Mist
-Fan
-Light
-Heater
+   Mist
+   Fan
+   Light
+   Heater
 ```
 🤖 AI Agent Responsibilities
 ```
