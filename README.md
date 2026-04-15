@@ -33,9 +33,8 @@ It combines:
 
 ## 🎯 Tiered Priority Control
 
-<!-- <div align="center"> -->
 
-```text
+```
 User Override
    ↓
 AI Agent
@@ -217,7 +216,7 @@ User authentication
  Analytics dashboard
 ```
 📖 Expand for More Details
-```
+
 <details> <summary><b>Sense → Think → Act Flow</b></summary>
 Sense
 
@@ -236,7 +235,7 @@ User manual override always wins
 AI only acts when manual override is not active
 ESP32 local failsafe protects habitat when network/cloud is unavailable
 </details>
-```
+
 👨‍💻 Author
 
 Built with passion for IoT, automation, and intelligent habitat systems.
