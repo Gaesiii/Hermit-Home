@@ -6,7 +6,9 @@ import '../../core/constants/app_constants.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../auth/auth_routes.dart';
+import 'data/device_control_repository.dart';
 import 'data/telemetry_repository.dart';
+import 'domain/device_control_state.dart';
 import 'domain/telemetry_model.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -19,8 +21,11 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   final AuthService _authService = AuthService();
   final TelemetryRepository _telemetryRepository = TelemetryRepository();
+  final DeviceControlRepository _deviceControlRepository =
+      DeviceControlRepository();
 
   bool _isLoading = true;
+
   String? _email;
   String? _token;
   String? _userId;
@@ -30,6 +35,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   List<TelemetryModel> _telemetry = const [];
   String? _telemetryError;
+
+  DeviceControlState _deviceState = DeviceControlState.initial;
+  DateTime? _deviceStateUpdatedAt;
+  int _deviceStateHistoryCount = 0;
+  String? _deviceStateError;
+  final Set<String> _pendingControlKeys = <String>{};
 
   @override
   void initState() {
@@ -64,10 +75,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     List<TelemetryModel> telemetry = const [];
     String? telemetryError;
 
+    DeviceControlSnapshot controlSnapshot = const DeviceControlSnapshot(
+      state: DeviceControlState.initial,
+      historyCount: 0,
+    );
+    String? controlError;
+
     if (resolvedUserId == null || resolvedUserId.isEmpty) {
-      telemetryError = 'Khong tim thay userId trong session hien tai.';
+      telemetryError = 'Cannot find userId in current session.';
+      controlError = 'Cannot find userId in current session.';
     } else if (token == null || token.isEmpty) {
-      telemetryError = 'Khong tim thay token dang nhap hop le.';
+      telemetryError = 'Cannot find valid access token.';
+      controlError = 'Cannot find valid access token.';
     } else {
       try {
         telemetry = await _telemetryRepository.fetchByUserId(
@@ -77,6 +96,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
       } catch (error) {
         telemetryError = error.toString().replaceFirst('Exception: ', '');
+      }
+
+      try {
+        controlSnapshot = await _deviceControlRepository.fetchCurrentState(
+          userId: resolvedUserId,
+          token: token,
+          limit: 100,
+        );
+      } catch (error) {
+        controlError = error.toString().replaceFirst('Exception: ', '');
       }
     }
 
@@ -89,10 +118,85 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _accountCreatedAt = accountCreatedAt;
       _lastLoginAt = lastLoginAt;
       _jwtInfo = sessionInfo;
+
       _telemetry = telemetry;
       _telemetryError = telemetryError;
+
+      _deviceState = controlSnapshot.state;
+      _deviceStateUpdatedAt = controlSnapshot.lastUpdatedAt;
+      _deviceStateHistoryCount = controlSnapshot.historyCount;
+      _deviceStateError = controlError;
+      _pendingControlKeys.clear();
+
       _isLoading = false;
     });
+  }
+
+  Future<void> _toggleDevice(String deviceKey, bool enabled) async {
+    final userId = _userId;
+    final token = _token;
+
+    if (userId == null || userId.isEmpty || token == null || token.isEmpty) {
+      _showSnack('Session is missing userId or token. Please sign in again.');
+      return;
+    }
+
+    if (_pendingControlKeys.contains(deviceKey)) {
+      return;
+    }
+
+    final previousValue = _deviceState.valueForKey(deviceKey);
+
+    setState(() {
+      _pendingControlKeys.add(deviceKey);
+      _deviceState = _deviceState.withKey(deviceKey, enabled);
+    });
+
+    try {
+      final result = await _deviceControlRepository.setDeviceState(
+        userId: userId,
+        token: token,
+        deviceKey: deviceKey,
+        enabled: enabled,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _deviceState = _deviceState.withKey(deviceKey, result.appliedValue);
+        _deviceStateUpdatedAt = DateTime.now();
+        _pendingControlKeys.remove(deviceKey);
+        _deviceStateError = null;
+      });
+
+      if (result.mistLockedOff) {
+        _showSnack('Mist safety lock is active. Mist remains OFF.');
+      }
+    } catch (error) {
+      if (!mounted) return;
+
+      final errorMessage = error.toString().replaceFirst('Exception: ', '');
+
+      setState(() {
+        _deviceState = _deviceState.withKey(deviceKey, previousValue);
+        _pendingControlKeys.remove(deviceKey);
+        _deviceStateError = errorMessage;
+      });
+
+      _showSnack(errorMessage);
+    }
+  }
+
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppTheme.error,
+        ),
+      );
   }
 
   Future<void> _logout() async {
@@ -131,6 +235,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _buildWelcomeCard(),
                   const SizedBox(height: 14),
                   _buildProfileCard(),
+                  const SizedBox(height: 14),
+                  _buildDeviceControlsCard(),
                   const SizedBox(height: 14),
                   _buildTelemetryCard(),
                   const SizedBox(height: 14),
@@ -254,6 +360,88 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Widget _buildDeviceControlsCard() {
+    return Container(
+      decoration: AppTheme.cardDecoration(radius: 18),
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Device Controls',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceVariant,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: const Color(0xFF2A3530)),
+                ),
+                child: Text(
+                  '$_deviceStateHistoryCount events',
+                  style: const TextStyle(fontSize: 12, color: AppTheme.subtle),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Last sync: ${_formatDateTime(_deviceStateUpdatedAt)}',
+            style: const TextStyle(fontSize: 12, color: AppTheme.subtle),
+          ),
+          if (_deviceStateError != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _deviceStateError!,
+              style: const TextStyle(color: AppTheme.error, height: 1.4),
+            ),
+          ],
+          const SizedBox(height: 10),
+          _DeviceControlTile(
+            label: 'Den',
+            subtitle: 'Light relay',
+            icon: Icons.lightbulb_outline_rounded,
+            value: _deviceState.light,
+            isBusy: _pendingControlKeys.contains('light'),
+            onChanged: (value) => _toggleDevice('light', value),
+          ),
+          const SizedBox(height: 10),
+          _DeviceControlTile(
+            label: 'Quat',
+            subtitle: 'Fan relay',
+            icon: Icons.air_rounded,
+            value: _deviceState.fan,
+            isBusy: _pendingControlKeys.contains('fan'),
+            onChanged: (value) => _toggleDevice('fan', value),
+          ),
+          const SizedBox(height: 10),
+          _DeviceControlTile(
+            label: 'Phun suong',
+            subtitle: 'Mist relay',
+            icon: Icons.water_drop_outlined,
+            value: _deviceState.mist,
+            isBusy: _pendingControlKeys.contains('mist'),
+            onChanged: (value) => _toggleDevice('mist', value),
+          ),
+          const SizedBox(height: 10),
+          _DeviceControlTile(
+            label: 'Suoi',
+            subtitle: 'Heater relay',
+            icon: Icons.local_fire_department_outlined,
+            value: _deviceState.heater,
+            isBusy: _pendingControlKeys.contains('heater'),
+            onChanged: (value) => _toggleDevice('heater', value),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTelemetryCard() {
     return Container(
       decoration: AppTheme.cardDecoration(radius: 18),
@@ -291,7 +479,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ] else if (_telemetry.isEmpty) ...[
             const Text(
-              'Chua co du lieu telemetry cho userId hien tai.',
+              'No telemetry records for this userId yet.',
               style: TextStyle(color: AppTheme.subtle),
             ),
           ] else ...[
@@ -446,6 +634,70 @@ class _InfoRow extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _DeviceControlTile extends StatelessWidget {
+  const _DeviceControlTile({
+    required this.label,
+    required this.subtitle,
+    required this.icon,
+    required this.value,
+    required this.isBusy,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String subtitle;
+  final IconData icon;
+  final bool value;
+  final bool isBusy;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceVariant,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF2A3530)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: value ? AppTheme.primary : AppTheme.subtle),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: const TextStyle(fontSize: 12, color: AppTheme.subtle),
+                ),
+              ],
+            ),
+          ),
+          if (isBusy)
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            Switch(
+              value: value,
+              onChanged: onChanged,
+              activeThumbColor: AppTheme.primary,
+            ),
+        ],
       ),
     );
   }
