@@ -31,12 +31,20 @@
   ],
   "routes": [
     {
+      "src": "/reset-password",
+      "dest": "/services/api/api/users/reset-password-link.ts"
+    },
+    {
+      "src": "/reset-password/",
+      "dest": "/services/api/api/users/reset-password-link.ts"
+    },
+    {
       "src": "/api/users/forgot-password",
-      "dest": "/services/api/api/users/forgot-password.ts"
+      "dest": "/services/api/api/users/password-reset.ts?mode=forgot"
     },
     {
       "src": "/api/users/reset-password",
-      "dest": "/services/api/api/users/reset-password.ts"
+      "dest": "/services/api/api/users/password-reset.ts?mode=reset"
     },
     {
       "src": "/api/users/login",
