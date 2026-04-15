@@ -55,6 +55,10 @@
       "dest": "/services/api/api/devices/[deviceId]/control.ts?deviceId=$1"
     },
     {
+      "src": "/api/devices/([^/]+)/telemetry",
+      "dest": "/services/api/api/devices/[deviceId]/telemetry.ts?deviceId=$1"
+    },
+    {
       "src": "/api/devices/schedules",
       "dest": "/services/api/api/devices/schedules/index.ts"
     },
