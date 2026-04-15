@@ -86,13 +86,14 @@ Tier 3 — Local Failsafe: on-device safety control when cloud is unavailable
 <!-- </div> -->
 
 ✨ Key Features
+```
 🌡️ Real-time environmental monitoring
 💧 Automated mist, fan, light, and heater control
 🤖 AI-assisted habitat optimization
 📡 MQTT-based telemetry pipeline
 ☁️ Cloud-connected control with local fallback logic
 📱 Mobile app integration for live monitoring and overrides
-
+```
 🧩 Tech Stack
 <!-- <div align="center"> -->
 ```
@@ -103,9 +104,11 @@ Backend	Node.js, TypeScript, Vercel
 Database	MongoDB Atlas
 AI	Python
 Mobile	Flutter
+```
 <!-- </div> -->
 
 📂 Monorepo Structure
+```
 smart-terrarium/
 ├── hardware/esp32/            # PlatformIO project for ESP32 firmware
 ├── packages/shared-types/     # Shared TypeScript interfaces
@@ -115,8 +118,9 @@ smart-terrarium/
 │   └── ai-agent/              # Autonomous AI controller
 ├── apps/mobile/               # Flutter mobile application
 └── infra/                     # Docker / infra config
-
+```
 🚀 Getting Started
+```
 1. Clone the repository
 git clone https://github.com/your-username/smart-terrarium.git
 cd smart-terrarium
@@ -126,7 +130,9 @@ npm install
 cd packages/shared-types
 npm run build
 cd ../..
+```
 🔐 Environment Variables
+```
 services/api/.env and services/mqtt-worker/.env
 MONGODB_URI="mongodb+srv://<user>:<password>@cluster.mongodb.net/?retryWrites=true&w=majority"
 MONGODB_DB_NAME="hermit-home"
@@ -137,7 +143,9 @@ MQTT_PASS="<password>"
 services/ai-agent/.env
 API_BASE_URL="http://localhost:3000"
 DEVICE_ID="<your_device_id_from_mongodb>"
+```
 🏃 Running Locally
+```
 Terminal 1 — REST API
 cd services/api
 vercel dev
@@ -150,7 +158,9 @@ python -m venv venv
 .\venv\Scripts\activate
 pip install -r requirements.txt
 python src/main.py
+```
 📡 API Endpoints
+```
 Get device status
 GET /api/devices/{deviceId}/status
 Send override command
@@ -176,13 +186,16 @@ Mist
 Fan
 Light
 Heater
+```
 🤖 AI Agent Responsibilities
+```
 Poll current terrarium state from API
 Evaluate environmental conditions
 Trigger device actions when needed
 Act as Tier-2 autonomous controller
+```
 📱 Mobile App
-
+```
 Planned mobile app features:
 
 Real-time telemetry monitoring
@@ -190,7 +203,9 @@ Manual override controls
 Device history
 AI chat-style interaction
 User authentication
+```
 🛣️ Roadmap
+```
  ESP32 telemetry publishing
  MQTT worker persistence
  REST API control endpoints
@@ -200,7 +215,9 @@ User authentication
  Device onboarding flow
  Multi-device support
  Analytics dashboard
+```
 📖 Expand for More Details
+```
 <details> <summary><b>Sense → Think → Act Flow</b></summary>
 Sense
 
@@ -219,6 +236,7 @@ User manual override always wins
 AI only acts when manual override is not active
 ESP32 local failsafe protects habitat when network/cloud is unavailable
 </details>
+```
 👨‍💻 Author
 
 Built with passion for IoT, automation, and intelligent habitat systems.
