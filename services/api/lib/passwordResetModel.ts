@@ -154,15 +154,6 @@ export async function consumePasswordResetToken(
   return result;
 }
 
-export async function findPasswordResetToken(
-  rawToken: string,
-): Promise<PasswordResetTokenDocument | null> {
-  const collection = await getPasswordResetCollection();
-  const tokenHash = hashPasswordResetToken(rawToken);
-
-  return collection.findOne({ tokenHash });
-}
-
 export async function invalidateAllPasswordResetTokensForUser(userId: ObjectId): Promise<void> {
   const collection = await getPasswordResetCollection();
   await collection.updateMany(

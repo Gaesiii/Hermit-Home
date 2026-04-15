@@ -31,14 +31,6 @@
   ],
   "routes": [
     {
-      "src": "/reset-password",
-      "dest": "/services/api/api/users/reset-password-link.ts"
-    },
-    {
-      "src": "/reset-password/",
-      "dest": "/services/api/api/users/reset-password-link.ts"
-    },
-    {
       "src": "/api/users/forgot-password",
       "dest": "/services/api/api/users/forgot-password.ts"
     },
