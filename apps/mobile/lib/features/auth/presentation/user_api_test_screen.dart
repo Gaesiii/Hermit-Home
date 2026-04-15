@@ -235,8 +235,9 @@ class _UserApiTestScreenState extends State<UserApiTestScreen> {
               decoration: InputDecoration(
                 labelText: 'Password',
                 suffixIcon: IconButton(
-                  onPressed:
-                      _isBusy ? null : () => setState(() => _hidePassword = !_hidePassword),
+                  onPressed: _isBusy
+                      ? null
+                      : () => setState(() => _hidePassword = !_hidePassword),
                   icon: Icon(
                     _hidePassword ? Icons.visibility_off : Icons.visibility,
                   ),
@@ -315,7 +316,7 @@ class _UserApiTestScreenState extends State<UserApiTestScreen> {
               constraints: const BoxConstraints(minHeight: 220),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: SelectableText(
