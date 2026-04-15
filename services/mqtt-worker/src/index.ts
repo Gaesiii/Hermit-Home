@@ -39,7 +39,7 @@ function resolveSelfPingUrl(): string | null {
     return null;
   }
 
-  return `${renderExternalUrl.replace(/\/+$/, '')}/ping`;
+  return `${renderExternalUrl.replace(/\/+$/, '')}/`;
 }
 
 function parseAllowedDeviceIds(): string[] {
@@ -194,6 +194,10 @@ function startHealthServer(): void {
   const port = Number.parseInt(process.env.PORT || '10000', 10);
 
   app.get('/ping', (_req, res) => {
+    res.status(200).send('MQTT Worker is running');
+  });
+
+  app.get('/', (_req, res) => {
     res.status(200).send('MQTT Worker is running');
   });
 
