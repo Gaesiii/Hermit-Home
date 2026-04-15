@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { Collection, ObjectId } from 'mongodb';
+import { Collection, MongoServerError, ObjectId } from 'mongodb';
 import { connectToDatabase } from './mongoClient';
 
 const PASSWORD_RESET_COLLECTION_NAME = 'password_reset_tokens';
@@ -32,7 +32,17 @@ function hasIndexNamed(indexes: IndexLike[], expectedName: string): boolean {
 async function ensurePasswordResetIndexes(
   collection: Collection<PasswordResetTokenDocument>,
 ): Promise<void> {
-  const existingIndexes = await collection.indexes();
+  let existingIndexes: IndexLike[] = [];
+  try {
+    existingIndexes = await collection.indexes();
+  } catch (error: unknown) {
+    if (!(error instanceof MongoServerError) || error.code !== 26) {
+      throw error;
+    }
+    // NamespaceNotFound means the collection does not exist yet.
+    // MongoDB will create it automatically when indexes/documents are created.
+    existingIndexes = [];
+  }
 
   if (!hasIndexNamed(existingIndexes, TOKEN_HASH_UNIQUE_INDEX_NAME)) {
     await collection.createIndex(
