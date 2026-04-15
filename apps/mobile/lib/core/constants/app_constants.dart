@@ -11,6 +11,17 @@ class AppConstants {
   static const String registerEndpoint = '/api/users/register';
   static const String loginEndpoint = '/api/users/login';
 
+  static const String devicesEndpoint = '/api/devices';
+  static const String deviceSchedulesEndpoint = '/api/devices/schedules';
+
+  static String deviceByIdEndpoint(String deviceId) => '/api/devices/$deviceId';
+  static String deviceStatusEndpoint(String deviceId) =>
+      '/api/devices/$deviceId/status';
+  static String deviceOverrideEndpoint(String deviceId) =>
+      '/api/devices/$deviceId/override';
+  static String deviceControlEndpoint(String deviceId) =>
+      '/api/devices/$deviceId/control';
+
   static const String tokenKey = 'hh_jwt_token';
   static const String emailKey = 'hh_user_email';
 

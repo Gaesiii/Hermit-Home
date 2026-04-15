@@ -12,8 +12,9 @@ export default function handler(req: VercelRequest, res: VercelResponse): void {
     return;
   }
 
-  res.status(501).json({
-    error: 'Not implemented',
-    message: 'Device schedule endpoints are not available yet.',
+  res.status(200).json({
+    success: true,
+    schedules: [],
+    message: 'Schedule API placeholder is active. No schedules configured yet.',
   });
 }

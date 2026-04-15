@@ -44,15 +44,15 @@
     },
     {
       "src": "/api/devices/([^/]+)/status",
-      "dest": "/services/api/api/devices/[deviceId]/status.ts"
+      "dest": "/services/api/api/devices/[deviceId]/status.ts?deviceId=$1"
     },
     {
       "src": "/api/devices/([^/]+)/override",
-      "dest": "/services/api/api/devices/[deviceId]/override.ts"
+      "dest": "/services/api/api/devices/[deviceId]/override.ts?deviceId=$1"
     },
     {
       "src": "/api/devices/([^/]+)/control",
-      "dest": "/services/api/api/devices/[deviceId]/control.ts"
+      "dest": "/services/api/api/devices/[deviceId]/control.ts?deviceId=$1"
     },
     {
       "src": "/api/devices/schedules",
@@ -60,7 +60,7 @@
     },
     {
       "src": "/api/devices/([^/]+)",
-      "dest": "/services/api/api/devices/[deviceId]/index.ts"
+      "dest": "/services/api/api/devices/[deviceId]/index.ts?deviceId=$1"
     },
     {
       "src": "/api/devices",

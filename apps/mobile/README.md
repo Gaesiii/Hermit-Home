@@ -1,27 +1,39 @@
 # Hermit-Home Mobile (API Test Build)
 
-This Flutter app currently boots into a simple **User API Test** screen for fast backend verification.
+This Flutter app boots directly into a unified **User + Device API Test** screen.
 
-## What You Can Test
+## Covered Endpoints
 
 - `POST /api/users/register`
 - `POST /api/users/login`
-- Secure token persistence in `flutter_secure_storage`
+- `GET /api/devices`
+- `GET /api/devices/schedules`
+- `GET /api/devices/{deviceId}`
+- `PATCH /api/devices/{deviceId}`
+- `GET /api/devices/{deviceId}/status`
+- `GET /api/devices/{deviceId}/control`
+- `POST /api/devices/{deviceId}/control`
+- `POST /api/devices/{deviceId}/override`
+- `OPTIONS` probes for key routes
 
-## Quick Run
+## Quick Run (Windows)
 
-1. Set your API base URL (optional):
-   - default is `https://hermit-home.vercel.app`
-   - override with:
-     - `flutter run --dart-define=API_BASE_URL=https://your-domain`
-2. Launch the app.
-3. Use the `User API Test` screen:
-   - Enter base URL, email, password
-   - Tap `Register` or `Login`
-   - Inspect the raw request/response panel
+1. Open PowerShell in this directory.
+2. Install packages:
+   - `F:\Hermit-Home\.sdk\flutter\bin\flutter.bat pub get`
+3. Run on Chrome:
+   - `F:\Hermit-Home\.sdk\flutter\bin\flutter.bat run -d chrome --dart-define=API_BASE_URL=https://hermit-home.vercel.app`
 
-## Notes
+## Usage Notes
 
-- `Login` saves `token` and `email` to secure storage.
-- `Load Saved Token` reloads current local session data.
-- `Clear Session` removes saved token/email from secure storage.
+- Login saves `token` and `email` to secure storage.
+- The screen can decode `userId` from JWT and auto-fill `deviceId`.
+- Protected API calls can use:
+  - `Authorization: Bearer <token>`
+  - `X-API-Key` (optional)
+- The output panel shows:
+  - method + URL
+  - status
+  - request body
+  - response headers
+  - response body
