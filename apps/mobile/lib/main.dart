@@ -1,50 +1,31 @@
-// lib/main.dart
-//
-// App entry point.
-// Checks secure storage for a saved token before deciding the first screen:
-//   • Token found  → Dashboard (skip login)
-//   • Token absent → Login screen
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'core/services/auth_service.dart';
-import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/login_screen.dart';
+import 'features/auth/presentation/user_api_test_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 
-void main() async {
-  // Required before any async work before runApp.
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Lock to portrait — common for phone-first IoT dashboards.
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  // Resolve the initial screen once before the widget tree is built.
-  // Avoids a flash of the login screen for already-authenticated users.
-  final isLoggedIn = await AuthService().isLoggedIn();
-
-  runApp(HermitHomeApp(isLoggedIn: isLoggedIn));
+  runApp(const HermitHomeApp());
 }
 
 class HermitHomeApp extends StatelessWidget {
-  final bool isLoggedIn;
-  const HermitHomeApp({super.key, required this.isLoggedIn});
+  const HermitHomeApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Hermit-Home',
+      title: 'Hermit-Home API Tester',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.themeData,
-
-      // Named routes — screens push/pop by name, keeping navigation
-      // logic out of the widgets themselves.
-      initialRoute: isLoggedIn ? '/dashboard' : '/login',
+      initialRoute: '/api-test',
       routes: {
+        '/api-test': (_) => const UserApiTestScreen(),
         '/login': (_) => const LoginScreen(),
         '/register': (_) => const RegisterScreen(),
         '/dashboard': (_) => const DashboardScreen(),

@@ -1,7 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getUsersCollection, hashPassword, toPublicUser } from '../../lib/userModel';
-
-// ─── Validation ───────────────────────────────────────────────────────────────
+import { handleApiPreflight, methodNotAllowed } from '../../lib/http';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -15,6 +14,7 @@ function validate(body: unknown): { email: string; password: string } | string {
   if (!email || typeof email !== 'string' || !EMAIL_RE.test(email)) {
     return 'A valid email address is required.';
   }
+
   if (!password || typeof password !== 'string' || password.length < 8) {
     return 'Password must be at least 8 characters.';
   }
@@ -22,35 +22,20 @@ function validate(body: unknown): { email: string; password: string } | string {
   return { email: email.toLowerCase().trim(), password };
 }
 
-// ─── Handler ──────────────────────────────────────────────────────────────────
-
-/**
- * POST /api/users/register
- *
- * Body   : { email: string, password: string }
- * Success: 201 { user: PublicUser }
- * Errors : 400 (validation), 409 (duplicate), 500 (unexpected)
- */
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse,
 ): Promise<void> {
-  // ── OPTIONS preflight ────────────────────────────────────────────────────────
-  // vercel.json already injects the Access-Control-* headers on every route.
-  // This guard ensures the function itself never returns 405 to a preflight,
-  // which would cause some HTTP clients to treat CORS as failed even when
-  // the headers are present.
-  if (req.method === 'OPTIONS') {
-    res.status(204).end();
+  const allowedMethods = ['POST'] as const;
+  if (handleApiPreflight(req, res, allowedMethods)) {
     return;
   }
 
   if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed.' });
+    methodNotAllowed(req, res, allowedMethods);
     return;
   }
 
-  // ── 1. Validate input ────────────────────────────────────────────────────────
   const input = validate(req.body);
   if (typeof input === 'string') {
     res.status(400).json({ error: input });
@@ -62,16 +47,14 @@ export default async function handler(
   try {
     const users = await getUsersCollection();
 
-    // ── 2. Guard against duplicate accounts ────────────────────────────────────
     const existing = await users.findOne({ email });
     if (existing) {
       res.status(409).json({ error: 'An account with that email already exists.' });
       return;
     }
 
-    // ── 3. Hash password and persist ───────────────────────────────────────────
     const passwordHash = await hashPassword(password);
-    const now          = new Date();
+    const now = new Date();
 
     const result = await users.insertOne({
       email,
@@ -80,25 +63,28 @@ export default async function handler(
       updatedAt: now,
     });
 
-    // ── 4. Return safe projection ─────────────────────────────────────────────
     const createdUser = await users.findOne({ _id: result.insertedId });
+    if (!createdUser) {
+      res.status(500).json({ error: 'Failed to load the created account.' });
+      return;
+    }
 
     res.status(201).json({
       message: 'Account created successfully.',
-      user:    toPublicUser(createdUser!),
+      user: toPublicUser(createdUser),
     });
-  } catch (err: unknown) {
-    // MongoDB duplicate-key race condition (between findOne and insertOne)
-    if (
-      err instanceof Error &&
-      'code' in err &&
-      (err as NodeJS.ErrnoException & { code: number }).code === 11000
-    ) {
+  } catch (error: unknown) {
+    const code =
+      typeof error === 'object' && error !== null && 'code' in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+
+    if (code === 11000) {
       res.status(409).json({ error: 'An account with that email already exists.' });
       return;
     }
 
-    console.error('[POST /api/users/register]', err);
+    console.error('[POST /api/users/register]', error);
     res.status(500).json({ error: 'An unexpected error occurred. Please try again.' });
   }
 }

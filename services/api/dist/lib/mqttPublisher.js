@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.publishCommand = publishCommand;
 const mqtt_1 = __importDefault(require("mqtt"));
 const dotenv_1 = __importDefault(require("dotenv"));
+const mistSafety_1 = require("./mistSafety");
 dotenv_1.default.config();
 function buildMqttOptions(username, password, caCert) {
     const options = {
@@ -38,7 +39,7 @@ async function publishCommand(deviceId, payload) {
         }, 5000);
         client.on('connect', () => {
             const topic = `terrarium/commands/${deviceId}`;
-            const message = JSON.stringify(payload);
+            const message = JSON.stringify((0, mistSafety_1.sanitizeCommandPayload)(payload));
             client.publish(topic, message, { qos: 1 }, (err) => {
                 clearTimeout(timeout);
                 client.end();

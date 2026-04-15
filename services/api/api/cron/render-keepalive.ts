@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { handleApiPreflight, methodNotAllowed } from '../../lib/http';
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const USER_AGENT = 'hermit-home-keepalive/1.0';
@@ -32,9 +33,13 @@ export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ): Promise<void> {
+  const allowedMethods = ['GET'] as const;
+  if (handleApiPreflight(req, res, allowedMethods)) {
+    return;
+  }
+
   if (req.method !== 'GET') {
-    res.setHeader('Allow', 'GET');
-    res.status(405).json({ error: 'Method not allowed.' });
+    methodNotAllowed(req, res, allowedMethods);
     return;
   }
 

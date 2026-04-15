@@ -3,9 +3,18 @@ import { publishCommand } from '../../../lib/mqttPublisher';
 import { CommandPayload } from '@smart-terrarium/shared-types';
 import { verifyAuth } from '../../../lib/authMiddleware';
 import { MIST_SAFETY_LOCK_ENABLED, sanitizeCommandPayload } from '../../../lib/mistSafety';
+import { handleApiPreflight, methodNotAllowed } from '../../../lib/http';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') return res.status(405).end();
+  const allowedMethods = ['POST'] as const;
+  if (handleApiPreflight(req, res, allowedMethods)) {
+    return;
+  }
+
+  if (req.method !== 'POST') {
+    methodNotAllowed(req, res, allowedMethods);
+    return;
+  }
 
   // ----------------------------------------------------------------
   //  Auth gate — SEV-1 fix

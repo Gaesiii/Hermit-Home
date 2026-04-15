@@ -15,6 +15,10 @@ build/
 .vercel/
 .next/
 *.log
+.sdk/
+.pub-cache/
+.appdata/
+.home/
 
 
 # Python cache
@@ -29,3 +33,5 @@ __pycache__/
 # OS metadata
 .DS_Store
 Thumbs.db
+
+.vercel

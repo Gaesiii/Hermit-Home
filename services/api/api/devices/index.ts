@@ -1,8 +1,14 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
+import { handleApiPreflight, methodNotAllowed } from '../../lib/http';
 
 export default function handler(req: VercelRequest, res: VercelResponse): void {
+  const allowedMethods = ['GET'] as const;
+  if (handleApiPreflight(req, res, allowedMethods)) {
+    return;
+  }
+
   if (req.method !== 'GET') {
-    res.status(405).json({ error: 'Method not allowed' });
+    methodNotAllowed(req, res, allowedMethods);
     return;
   }
 

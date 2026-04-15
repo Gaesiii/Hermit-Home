@@ -1,4 +1,4 @@
-import type { VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { CommandPayload } from '@smart-terrarium/shared-types';
 import { withAuth, AuthenticatedRequest } from '../../../lib/authMiddleware';
 import {
@@ -10,6 +10,7 @@ import {
 } from '../../../lib/deviceStateModel';
 import { publishCommand } from '../../../lib/mqttPublisher';
 import { MIST_SAFETY_LOCK_ENABLED, sanitizeRelayMap } from '../../../lib/mistSafety';
+import { handleApiPreflight, methodNotAllowed } from '../../../lib/http';
 
 const OBJECT_ID_REGEX = /^[a-f\d]{24}$/i;
 
@@ -152,7 +153,9 @@ async function handlePost(
   }
 }
 
-export default withAuth(async (
+const allowedMethods = ['GET', 'POST'] as const;
+
+const authenticatedHandler = withAuth(async (
   req: AuthenticatedRequest,
   res: VercelResponse
 ): Promise<void> => {
@@ -164,9 +167,22 @@ export default withAuth(async (
       await handlePost(req, res);
       break;
     default:
-      res.setHeader('Allow', 'GET, POST');
-      res.status(405).json({
-        error: `Method '${req.method}' is not allowed on this endpoint.`,
-      });
+      methodNotAllowed(req, res, allowedMethods);
   }
 });
+
+export default async function handler(
+  req: VercelRequest,
+  res: VercelResponse,
+): Promise<void> {
+  if (handleApiPreflight(req, res, allowedMethods)) {
+    return;
+  }
+
+  if (req.method !== 'GET' && req.method !== 'POST') {
+    methodNotAllowed(req, res, allowedMethods);
+    return;
+  }
+
+  await authenticatedHandler(req, res);
+}

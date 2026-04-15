@@ -1,15 +1,7 @@
-import { MongoClient, Db, Collection, ObjectId } from 'mongodb';
+import { Collection, MongoServerError, ObjectId } from 'mongodb';
 import bcrypt from 'bcryptjs';
-import dotenv from 'dotenv';
+import { connectToDatabase } from './mongoClient';
 
-dotenv.config();
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-/**
- * The shape of a document stored in the `users` collection.
- * `passwordHash` is NEVER returned to the client.
- */
 export interface UserDocument {
   _id?: ObjectId;
   email: string;
@@ -18,103 +10,114 @@ export interface UserDocument {
   updatedAt: Date;
 }
 
-/**
- * Safe subset returned to API callers — secrets are stripped.
- */
 export type PublicUser = Pick<UserDocument, '_id' | 'email' | 'createdAt'>;
 
-// ─── Connection (module-level singleton) ──────────────────────────────────────
+const USERS_COLLECTION_NAME = 'users';
+const EMAIL_UNIQUE_INDEX_NAME = 'email_unique';
+const SALT_ROUNDS = 12;
 
-const MONGODB_URI = process.env.MONGODB_URI ?? '';
-const MONGODB_DB  = process.env.MONGODB_DB_NAME ?? 'hermit-home';
+type IndexLike = {
+  name?: unknown;
+  key?: unknown;
+  unique?: unknown;
+};
 
-if (!MONGODB_URI) {
-  throw new Error('Missing required environment variable: MONGODB_URI');
-}
+let usersIndexReadyPromise: Promise<void> | null = null;
 
-let cachedClient: MongoClient | null = (global as any)._mongoClient ?? null;
-let cachedDb:     Db          | null = (global as any)._mongoDb     ?? null;
-
-async function connectToDatabase(): Promise<Db> {
-  if (cachedClient && cachedDb) {
-    return cachedDb;
+function isUniqueEmailIndex(index: IndexLike): boolean {
+  if (index.unique !== true) {
+    return false;
   }
 
-  const client = await MongoClient.connect(MONGODB_URI);
-  const db     = client.db(MONGODB_DB);
+  const key = index.key;
+  if (!key || typeof key !== 'object') {
+    return false;
+  }
 
-  cachedClient = client;
-  cachedDb     = db;
-  (global as any)._mongoClient = client;
-  (global as any)._mongoDb     = db;
-
-  return db;
+  return (key as Record<string, unknown>).email === 1;
 }
 
-// ─── Collection helper ────────────────────────────────────────────────────────
+async function ensureUsersIndexes(collection: Collection<UserDocument>): Promise<void> {
+  const existingIndexes = await collection.indexes();
 
-/**
- * Returns the typed `users` collection and guarantees the unique email index
- * exists on every invocation.
- *
- * createIndex is idempotent — MongoDB silently skips the operation when the
- * index already exists, so calling this on every request is safe and costs
- * only ~1 ms on warm connections.
- *
- * WHY THIS MUST NOT BE COMMENTED OUT:
- * The application-level duplicate check (findOne → insertOne) has an inherent
- * race condition. Two concurrent registrations with the same email can both
- * pass findOne before either insertOne runs, resulting in duplicate accounts.
- * The unique index is the only reliable, atomic guard against this scenario —
- * when the second insertOne fires, MongoDB rejects it with error code 11000,
- * which register.ts catches and maps to a 409 response.
- */
-export async function getUsersCollection(): Promise<Collection<UserDocument>> {
-  const db         = await connectToDatabase();
-  const collection = db.collection<UserDocument>('users');
-
-  // This is intentionally NOT commented out. See the comment above.
-  await collection.createIndex(
-    { email: 1 },
-    { unique: true, name: 'email_unique' },
+  const namedIndex = existingIndexes.find(
+    (index) => index.name === EMAIL_UNIQUE_INDEX_NAME,
   );
 
+  if (namedIndex) {
+    if (isUniqueEmailIndex(namedIndex)) {
+      return;
+    }
+
+    throw new Error(
+      `Invalid index definition for '${EMAIL_UNIQUE_INDEX_NAME}'. Expected unique index on { email: 1 }.`,
+    );
+  }
+
+  const equivalentUniqueIndex = existingIndexes.find((index) => isUniqueEmailIndex(index));
+  if (equivalentUniqueIndex) {
+    return;
+  }
+
+  try {
+    await collection.createIndex(
+      { email: 1 },
+      {
+        unique: true,
+        name: EMAIL_UNIQUE_INDEX_NAME,
+        collation: { locale: 'en', strength: 2 },
+      },
+    );
+  } catch (error: unknown) {
+    if (
+      error instanceof MongoServerError &&
+      (error.code === 85 || error.code === 86)
+    ) {
+      const refreshedIndexes = await collection.indexes();
+      if (refreshedIndexes.some((index) => isUniqueEmailIndex(index))) {
+        return;
+      }
+    }
+
+    throw error;
+  }
+}
+
+async function ensureUsersIndexesOnce(collection: Collection<UserDocument>): Promise<void> {
+  if (!usersIndexReadyPromise) {
+    usersIndexReadyPromise = ensureUsersIndexes(collection);
+  }
+
+  try {
+    await usersIndexReadyPromise;
+  } catch (error: unknown) {
+    usersIndexReadyPromise = null;
+    throw error;
+  }
+}
+
+export async function getUsersCollection(): Promise<Collection<UserDocument>> {
+  const { db } = await connectToDatabase();
+  const collection = db.collection<UserDocument>(USERS_COLLECTION_NAME);
+  await ensureUsersIndexesOnce(collection);
   return collection;
 }
 
-// ─── Password helpers ─────────────────────────────────────────────────────────
-
-const SALT_ROUNDS = 12; // ~250 ms on a modern CPU — good brute-force resistance
-
-/**
- * Returns the bcrypt hash of a plain-text password.
- * Always call this before persisting any credential.
- */
 export async function hashPassword(plain: string): Promise<string> {
   return bcrypt.hash(plain, SALT_ROUNDS);
 }
 
-/**
- * Constant-time comparison of a plain-text password against a stored hash.
- * Returns `true` only when they match.
- */
 export async function verifyPassword(
   plain: string,
-  hash:  string,
+  hash: string,
 ): Promise<boolean> {
   return bcrypt.compare(plain, hash);
 }
 
-// ─── Projection helper ────────────────────────────────────────────────────────
-
-/**
- * Strips secrets from a full UserDocument before the object leaves the API layer.
- * Always use this instead of returning the raw document.
- */
 export function toPublicUser(user: UserDocument): PublicUser {
   return {
-    _id:       user._id,
-    email:     user.email,
+    _id: user._id,
+    email: user.email,
     createdAt: user.createdAt,
   };
 }

@@ -32,10 +32,14 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.verifyAuth = verifyAuth;
 exports.withAuth = withAuth;
 const admin = __importStar(require("firebase-admin"));
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 let firebaseInitialized = false;
 function readHeaderValue(value) {
     if (typeof value === 'string') {
@@ -67,6 +71,18 @@ function ensureFirebaseInitialized() {
     });
     firebaseInitialized = true;
 }
+function verifyInternalJwtToken(token) {
+    const jwtSecret = process.env.JWT_SECRET || '';
+    if (!jwtSecret) {
+        return null;
+    }
+    const decoded = jsonwebtoken_1.default.verify(token, jwtSecret);
+    if (typeof decoded !== 'object' || decoded === null) {
+        return null;
+    }
+    const userId = decoded.userId;
+    return typeof userId === 'string' && userId.trim().length > 0 ? userId : null;
+}
 async function verifyAuth(req, res) {
     const providedApiKey = readHeaderValue(req.headers['x-api-key']);
     const expectedApiKey = process.env.SERVICE_API_KEY || '';
@@ -97,10 +113,22 @@ async function verifyAuth(req, res) {
         });
         return null;
     }
+    let firebaseError = null;
     try {
-        ensureFirebaseInitialized();
-        const decodedToken = await admin.auth().verifyIdToken(idToken);
-        return decodedToken.uid;
+        if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+            ensureFirebaseInitialized();
+            const decodedToken = await admin.auth().verifyIdToken(idToken);
+            return decodedToken.uid;
+        }
+    }
+    catch (error) {
+        firebaseError = error;
+    }
+    try {
+        const internalUserId = verifyInternalJwtToken(idToken);
+        if (internalUserId) {
+            return internalUserId;
+        }
     }
     catch (error) {
         const isExpired = error instanceof Error && error.message.toLowerCase().includes('expired');
@@ -110,6 +138,13 @@ async function verifyAuth(req, res) {
         });
         return null;
     }
+    const firebaseTokenExpired = firebaseError instanceof Error &&
+        firebaseError.message.toLowerCase().includes('expired');
+    res.status(401).json({
+        error: 'Unauthorized',
+        message: firebaseTokenExpired ? 'Token has expired.' : 'Invalid token.',
+    });
+    return null;
 }
 function withAuth(handler) {
     return async (req, res) => {

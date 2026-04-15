@@ -3,9 +3,16 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.default = handler;
 const mongoClient_1 = require("../../../lib/mongoClient");
 const authMiddleware_1 = require("../../../lib/authMiddleware");
+const http_1 = require("../../../lib/http");
 async function handler(req, res) {
-    if (req.method !== 'GET')
-        return res.status(405).end();
+    const allowedMethods = ['GET'];
+    if ((0, http_1.handleApiPreflight)(req, res, allowedMethods)) {
+        return;
+    }
+    if (req.method !== 'GET') {
+        (0, http_1.methodNotAllowed)(req, res, allowedMethods);
+        return;
+    }
     // ----------------------------------------------------------------
     //  Auth gate — SEV-2 fix
     //  Same pattern as override.ts: return immediately on null so

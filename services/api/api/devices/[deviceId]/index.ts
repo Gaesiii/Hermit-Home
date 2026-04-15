@@ -4,12 +4,19 @@ import { connectToDatabase } from '../../../lib/mongoClient';
 import { getDeviceById, patchDeviceById } from '../../../lib/deviceRepository';
 import { verifyAuth } from '../../../lib/authMiddleware';
 import { sanitizeDeviceStatePatch } from '../../../lib/mistSafety';
+import { handleApiPreflight, methodNotAllowed } from '../../../lib/http';
 
 const OBJECT_ID_REGEX = /^[a-f\d]{24}$/i;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const allowedMethods = ['GET', 'PATCH'] as const;
+  if (handleApiPreflight(req, res, allowedMethods)) {
+    return;
+  }
+
   if (req.method !== 'GET' && req.method !== 'PATCH') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    methodNotAllowed(req, res, allowedMethods);
+    return;
   }
 
   const uid = await verifyAuth(req, res);

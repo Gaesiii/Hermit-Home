@@ -1,9 +1,18 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { connectToDatabase } from '../../../lib/mongoClient';
 import { verifyAuth } from '../../../lib/authMiddleware';
+import { handleApiPreflight, methodNotAllowed } from '../../../lib/http';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'GET') return res.status(405).end();
+  const allowedMethods = ['GET'] as const;
+  if (handleApiPreflight(req, res, allowedMethods)) {
+    return;
+  }
+
+  if (req.method !== 'GET') {
+    methodNotAllowed(req, res, allowedMethods);
+    return;
+  }
 
   // ----------------------------------------------------------------
   //  Auth gate — SEV-2 fix
