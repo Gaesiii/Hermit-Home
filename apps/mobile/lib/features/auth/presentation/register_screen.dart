@@ -68,7 +68,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     setState(() => _isLoading = false);
 
     if (result.isSuccess) {
-      Navigator.pushReplacementNamed(context, AuthRoutes.home);
+      Navigator.pushReplacementNamed(context, '/dashboard');
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

@@ -4,7 +4,6 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/services/auth_service.dart';
-import '../auth_routes.dart';
 
 enum AppThemeMode { day, auto, night }
 
@@ -174,7 +173,7 @@ class _LoginScreenState extends State<LoginScreen>
       // ĐĂNG NHẬP THÀNH CÔNG -> Lưu tài khoản nếu có tích
       await _saveOrClearCredentials();
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, AuthRoutes.home);
+      Navigator.pushReplacementNamed(context, '/dashboard');
     } else {
       _showError('Mật mã vỏ không đúng rồi!');
     }
@@ -193,7 +192,7 @@ class _LoginScreenState extends State<LoginScreen>
     if (!mounted) return;
     setState(() => _isLoading = false);
     if (result.isSuccess)
-      Navigator.pushReplacementNamed(context, AuthRoutes.home);
+      Navigator.pushReplacementNamed(context, '/dashboard');
     else
       _showError(result.errorMessage ?? 'Dựng vỏ thất bại!');
   }
