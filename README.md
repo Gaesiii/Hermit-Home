@@ -1,96 +1,170 @@
-# 🦀 Smart Terrarium Monorepo (Hermit Home)
+<div align="center">
 
-An intelligent, event-driven IoT system for monitoring and controlling a Hermit Crab terrarium. This project uses a microservices architecture (Monorepo) combining Edge computing (ESP32), Cloud messaging (MQTT), Serverless APIs (Vercel), and an autonomous AI Agent.
+<img width="100%" src="https://capsule-render.vercel.app/api?type=waving&height=220&text=Smart%20Terrarium%20%7C%20Hermit%20Home&fontSize=38&fontAlignY=40&desc=Autonomous%20IoT%20Habitat%20for%20Hermit%20Crabs&descAlignY=60" />
 
-## 🏗️ System Architecture
+<img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=22&pause=1000&center=true&vCenter=true&width=900&lines=Event-driven+IoT+system+for+Hermit+Crab+care;ESP32+%2B+MQTT+%2B+Vercel+API+%2B+AI+Agent;Tiered+Priority+Control%3A+User+%3E+AI+%3E+Local+Failsafe" />
 
-The system operates on a Tiered Priority Control model (User > AI > Local Failsafe) and consists of the following core components:
+<br/>
 
-* **Hardware (ESP32):** Reads sensors (DHT22, BH1750, Soil Moisture), executes local hysteresis logic, and controls relays (Mist, Fan, Light, Heater).
-* **MQTT Worker (Node.js):** A background daemon that subscribes to HiveMQ, processes real-time telemetry, and persists data to MongoDB.
-* **REST API (Vercel Serverless):** The gateway for frontend apps and AI agents to fetch device status and send manual override commands.
-* **AI Agent (Python):** A Tier-2 autonomous controller that periodically polls the API, evaluates environmental conditions, and triggers actions.
-* **Mobile App (Flutter - Planned):** The Tier-1 user interface for real-time monitoring and manual overrides.
+<img src="https://img.shields.io/badge/ESP32-Edge%20Device-blue?style=for-the-badge" />
+<img src="https://img.shields.io/badge/MQTT-HiveMQ-green?style=for-the-badge" />
+<img src="https://img.shields.io/badge/API-Vercel-black?style=for-the-badge" />
+<img src="https://img.shields.io/badge/AI-Python-red?style=for-the-badge" />
+<img src="https://img.shields.io/badge/Mobile-Flutter-02569B?style=for-the-badge" />
+<img src="https://img.shields.io/badge/Architecture-Monorepo-orange?style=for-the-badge" />
 
-## 📂 Monorepo Structure
+</div>
 
-```text
+---
+
+## 🦀 About The Project
+
+**Smart Terrarium — Hermit Home** is an intelligent, event-driven IoT ecosystem designed to monitor and autonomously control a hermit crab habitat.
+
+It combines:
+
+- **ESP32 edge hardware** for real-time sensing and actuation
+- **MQTT messaging** for telemetry flow
+- **Serverless REST APIs** for device interaction
+- **An autonomous AI Agent** for decision-making
+- **A Flutter mobile app** for user control and monitoring
+
+---
+
+## 🎯 Tiered Priority Control
+
+
+```
+User Override
+   ↓
+AI Agent
+   ↓
+Local Failsafe (ESP32)
+```
+<!-- </div> -->
+
+This system follows a tiered control architecture:
+```
+Tier 1 — User: highest priority manual override
+Tier 2 — AI Agent: autonomous optimization logic
+Tier 3 — Local Failsafe: on-device safety control when cloud is unavailable
+```
+🏗️ System Architecture
+
+<!-- <div align="center"> -->
+
+         ┌────────────────────┐
+         │   Flutter Mobile   │
+         │       App          │
+         └─────────┬──────────┘
+                   │ REST API
+                   ▼
+        ┌───────────────────────┐
+        │  Vercel Serverless API│
+        └─────────┬─────────────┘
+                  │
+                  ▼
+           ┌──────────────┐
+           │   MongoDB    │
+           └──────┬───────┘
+                  │
+                  ▼
+        ┌───────────────────────┐
+        │   MQTT Worker (Node)  │
+        └─────────┬─────────────┘
+                  │ MQTT
+                  ▼
+             ┌───────────┐
+             │  HiveMQ   │
+             └────┬──────┘
+                  │
+                  ▼
+           ┌──────────────┐
+           │    ESP32     │
+           └──────────────┘
+
+<!-- </div> -->
+
+✨ Key Features
+```
+🌡️ Real-time environmental monitoring
+💧 Automated mist, fan, light, and heater control
+🤖 AI-assisted habitat optimization
+📡 MQTT-based telemetry pipeline
+☁️ Cloud-connected control with local fallback logic
+📱 Mobile app integration for live monitoring and overrides
+```
+🧩 Tech Stack
+<!-- <div align="center"> -->
+```
+Layer	Technology
+Hardware	ESP32, DHT22, BH1750, Soil Moisture
+Messaging	MQTT, HiveMQ
+Backend	Node.js, TypeScript, Vercel
+Database	MongoDB Atlas
+AI	Python
+Mobile	Flutter
+```
+<!-- </div> -->
+
+📂 Monorepo Structure
+```
 smart-terrarium/
-├── hardware/esp32/            # PlatformIO C++ project (Edge Device)
-├── packages/shared-types/     # Shared TS interfaces (Single Source of Truth)
+├── hardware/esp32/            # PlatformIO project for ESP32 firmware
+├── packages/shared-types/     # Shared TypeScript interfaces
 ├── services/
-│   ├── api/                   # Serverless REST API (Vercel/Node.js)
-│   ├── mqtt-worker/           # Telemetry consumer daemon (Node.js)
-│   └── ai-agent/              # Autonomous decision logic (Python)
+│   ├── api/                   # Vercel serverless REST API
+│   ├── mqtt-worker/           # MQTT consumer daemon
+│   └── ai-agent/              # Autonomous AI controller
 ├── apps/mobile/               # Flutter mobile application
-└── infra/                     # Docker and infrastructure configs
+└── infra/                     # Docker / infra config
+```
+🚀 Getting Started
 
-Getting Started
-1. Install Dependencies (Workspaces)
-This project uses NPM Workspaces. Run the install command from the root directory to install all Node.js dependencies across packages and services.
-
-Bash
-# At the root directory (smart-terrarium/)
+1. Clone the repository
+git clone https://github.com/your-username/smart-terrarium.git
+cd smart-terrarium
+2. Install dependencies
 npm install
-2. Build Shared Packages
-Before running the services, compile the shared TypeScript definitions.
-
-Bash
+3. Build shared packages
 cd packages/shared-types
 npm run build
 cd ../..
 
-3. Environment Variables (.env)
-You need to configure .env files for each service to maintain the principle of least privilege.
-
-For services/mqtt-worker/.env and services/api/.env:
-
-Đoạn mã
+🔐 Environment Variables
+```
+services/api/.env and services/mqtt-worker/.env
 MONGODB_URI="mongodb+srv://<user>:<password>@cluster.mongodb.net/?retryWrites=true&w=majority"
 MONGODB_DB_NAME="hermit-home"
 MQTT_BROKER="<your-cluster>.hivemq.cloud"
 MQTT_PORT=8883
 MQTT_USER="<username>"
 MQTT_PASS="<password>"
-For services/ai-agent/.env:
-
-Đoạn mã
+services/ai-agent/.env
 API_BASE_URL="http://localhost:3000"
 DEVICE_ID="<your_device_id_from_mongodb>"
-🏃‍♂️ Running the System Locally
-To test the complete Sense-Think-Act loop locally, you must run the following services concurrently in separate terminal windows:
-
-Terminal 1: Start the REST API
-
-Bash
+```
+🏃 Running Locally
+```
+Terminal 1 — REST API
 cd services/api
 vercel dev
-# Runs on http://localhost:3000
-Terminal 2: Start the MQTT Worker
-
-Bash
+Terminal 2 — MQTT Worker
 cd services/mqtt-worker
 npm run dev
-# Connects to HiveMQ and MongoDB
-Terminal 3: Start the AI Agent
-
-Bash
+Terminal 3 — AI Agent
 cd services/ai-agent
 python -m venv venv
-# Activate venv: `.\venv\Scripts\activate` (Windows) or `source venv/bin/activate` (Mac/Linux)
+.\venv\Scripts\activate
 pip install -r requirements.txt
 python src/main.py
-# Executes the control loop every 60 seconds
-📡 API Endpoints (Local)
-Get Status: GET http://localhost:3000/api/devices/{deviceId}/status
-
-Send Command: POST http://localhost:3000/api/devices/{deviceId}/override
-
-Forgot Password: POST http://localhost:3000/api/users/forgot-password
-
-Reset Password: POST http://localhost:3000/api/users/reset-password
-
-JSON
+```
+📡 API Endpoints
+```
+Get device status
+GET /api/devices/{deviceId}/status
+Send override command
+POST /api/devices/{deviceId}/override
 {
   "user_override": true,
   "devices": {
@@ -98,40 +172,75 @@ JSON
     "light": false
   }
 }
+Auth endpoints
+POST /api/users/forgot-password
+POST /api/users/reset-password
+```
+🔌 Hardware Responsibilities
+```
+Read sensors:
+   DHT22
+   BH1750
+   Soil Moisture
+   Execute local hysteresis / failsafe logic
 
+Control relays for:
+   Mist
+   Fan
+   Light
+   Heater
+```
+🤖 AI Agent Responsibilities
+```
+Poll current terrarium state from API
+Evaluate environmental conditions
+Trigger device actions when needed
+Act as Tier-2 autonomous controller
+```
+📱 Mobile App
+```
+Planned mobile app features:
+   Real-time telemetry monitoring
+   Manual override controls
+   Device history
+   AI chat-style interaction
+   User authentication
+```
+🛣️ Roadmap
+```
+ ESP32 telemetry publishing
+ MQTT worker persistence
+ REST API control endpoints
+ AI-based decision loop
+ Flutter mobile UI completion
+ Push notifications
+ Device onboarding flow
+ Multi-device support
+ Analytics dashboard
+```
+📖 Expand for More Details
 
-## 🛠️ Step-by-Step Setup Guide
+<details> <summary><b>Sense → Think → Act Flow</b></summary>
+Sense
 
-**1. Clone the repository**
-```bash
-git clone [https://github.com/your-username/smart-terrarium.git](https://github.com/your-username/smart-terrarium.git)
-cd smart-terrarium
+ESP32 reads data from habitat sensors and publishes telemetry via MQTT.
 
+Think
 
-2. Install all Node.js dependencies (Workspaces)
+MQTT Worker stores telemetry in MongoDB, while the AI Agent polls device state from the API and evaluates whether environmental adjustment is needed.
 
-Bash
-npm install
-3. Configure Environment Variables
-Copy the template to create actual .env files for each service:
+Act
 
-Copy .env.example to services/api/.env
+Commands are issued either by the user or the AI agent, then propagated back to the ESP32 for relay control.
 
-Copy .env.example to services/mqtt-worker/.env
+</details> <details> <summary><b>Priority Rules</b></summary>
+User manual override always wins
+AI only acts when manual override is not active
+ESP32 local failsafe protects habitat when network/cloud is unavailable
+</details>
 
-Copy .env.example to services/ai-agent/.env
-(Fill in your own MongoDB and HiveMQ credentials in these new .env files).
+👨‍💻 Author
 
-4. Hardware Setup (ESP32)
+Built with passion for IoT, automation, and intelligent habitat systems.
 
-Open the hardware/esp32 folder in VS Code.
-
-Install the PlatformIO extension.
-
-Rename include/config.example.h to include/config.h and add your WiFi credentials.
-
-Click the Upload button in PlatformIO to flash the ESP32.
-
-
----
-
+<div align="center"> <img width="100%" src="https://capsule-render.vercel.app/api?type=waving&section=footer&height=120" /> </div> ```
