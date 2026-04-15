@@ -12,6 +12,15 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SUCCESS_MESSAGE =
   'If an account with that email exists, a password reset link has been sent.';
 
+type SerializableError = {
+  name?: string;
+  message?: string;
+  code?: string | number;
+  response?: string;
+  responseCode?: number;
+  command?: string;
+};
+
 function readHeaderValue(value: string | string[] | undefined): string | null {
   if (typeof value === 'string') {
     return value;
@@ -22,6 +31,35 @@ function readHeaderValue(value: string | string[] | undefined): string | null {
   }
 
   return null;
+}
+
+function isDebugEnabled(req: VercelRequest): boolean {
+  const headerDebug = readHeaderValue(req.headers['x-debug-password-reset']);
+  if (headerDebug === '1' || headerDebug?.toLowerCase() === 'true') {
+    return true;
+  }
+
+  const envDebug = (process.env.PASSWORD_RESET_DEBUG || '').trim().toLowerCase();
+  return envDebug === '1' || envDebug === 'true' || envDebug === 'yes' || envDebug === 'on';
+}
+
+function serializeError(error: unknown): SerializableError {
+  if (typeof error !== 'object' || error === null) {
+    return { message: String(error) };
+  }
+
+  const typed = error as Record<string, unknown>;
+  return {
+    name: typeof typed.name === 'string' ? typed.name : undefined,
+    message: typeof typed.message === 'string' ? typed.message : undefined,
+    code:
+      typeof typed.code === 'string' || typeof typed.code === 'number'
+        ? typed.code
+        : undefined,
+    response: typeof typed.response === 'string' ? typed.response : undefined,
+    responseCode: typeof typed.responseCode === 'number' ? typed.responseCode : undefined,
+    command: typeof typed.command === 'string' ? typed.command : undefined,
+  };
 }
 
 function readClientIp(req: VercelRequest): string | null {
@@ -96,7 +134,17 @@ export default async function handler(
 
     res.status(200).json({ message: SUCCESS_MESSAGE });
   } catch (error: unknown) {
-    console.error('[POST /api/users/forgot-password]', error);
+    const debugError = serializeError(error);
+    console.error('[POST /api/users/forgot-password]', debugError);
+
+    if (isDebugEnabled(req)) {
+      res.status(500).json({
+        error: 'An unexpected error occurred. Please try again.',
+        debug: debugError,
+      });
+      return;
+    }
+
     res.status(500).json({ error: 'An unexpected error occurred. Please try again.' });
   }
 }
