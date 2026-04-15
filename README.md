@@ -119,7 +119,7 @@ smart-terrarium/
 └── infra/                     # Docker / infra config
 ```
 🚀 Getting Started
-```
+
 1. Clone the repository
 git clone https://github.com/your-username/smart-terrarium.git
 cd smart-terrarium
@@ -129,7 +129,7 @@ npm install
 cd packages/shared-types
 npm run build
 cd ../..
-```
+
 🔐 Environment Variables
 ```
 services/api/.env and services/mqtt-worker/.env
@@ -174,7 +174,9 @@ POST /api/devices/{deviceId}/override
 Auth endpoints
 POST /api/users/forgot-password
 POST /api/users/reset-password
+```
 🔌 Hardware Responsibilities
+```
 Read sensors:
 DHT22
 BH1750
@@ -196,15 +198,14 @@ Act as Tier-2 autonomous controller
 📱 Mobile App
 ```
 Planned mobile app features:
-
-Real-time telemetry monitoring
-Manual override controls
-Device history
-AI chat-style interaction
-User authentication
+   Real-time telemetry monitoring
+   Manual override controls
+   Device history
+   AI chat-style interaction
+   User authentication
 ```
 🛣️ Roadmap
-
+```
  ESP32 telemetry publishing
  MQTT worker persistence
  REST API control endpoints
@@ -214,7 +215,7 @@ User authentication
  Device onboarding flow
  Multi-device support
  Analytics dashboard
-
+```
 📖 Expand for More Details
 
 <details> <summary><b>Sense → Think → Act Flow</b></summary>
