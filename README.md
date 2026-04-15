@@ -94,7 +94,7 @@ Tier 3 — Local Failsafe: on-device safety control when cloud is unavailable
 📱 Mobile app integration for live monitoring and overrides
 
 🧩 Tech Stack
-<div align="center">
+<!-- <div align="center"> -->
 Layer	Technology
 Hardware	ESP32, DHT22, BH1750, Soil Moisture
 Messaging	MQTT, HiveMQ
@@ -102,7 +102,7 @@ Backend	Node.js, TypeScript, Vercel
 Database	MongoDB Atlas
 AI	Python
 Mobile	Flutter
-</div>
+<!-- </div> -->
 
 📂 Monorepo Structure
 smart-terrarium/
