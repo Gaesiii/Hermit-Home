@@ -12,6 +12,8 @@ const DEVICE_ID_REGEX = /^[a-f\d]{24}$/i;
 const DEFAULT_SELF_PING_INTERVAL_MS = 3 * 60 * 1000;
 const DEFAULT_SELF_PING_TIMEOUT_MS = 10_000;
 const SELF_PING_USER_AGENT = 'mqtt-worker-self-keepalive/1.0';
+const TELEMETRY_WILDCARD_TOPIC = 'terrarium/telemetry/+';
+const CONFIRM_WILDCARD_TOPIC = 'terrarium/confirm/+';
 
 function parsePositiveInteger(value: string | undefined, fallback: number): number {
   if (!value) {
@@ -48,9 +50,7 @@ function parseAllowedDeviceIds(): string[] {
     .filter(Boolean);
 
   if (ids.length === 0) {
-    throw new Error(
-      'Missing ALLOWED_DEVICE_IDS (or DEVICE_ID). Configure at least one authorized device id.'
-    );
+    return [];
   }
 
   const uniqueIds = [...new Set(ids)];
@@ -98,12 +98,24 @@ async function bootstrap(): Promise<void> {
   }
 
   const allowedDeviceIds = parseAllowedDeviceIds();
-  const authorizedTopics = allowedDeviceIds.map((deviceId) => `terrarium/telemetry/${deviceId}`);
-  const authorizedConfirmTopics = allowedDeviceIds.map((deviceId) => `terrarium/confirm/${deviceId}`);
-  const allowedDeviceIdSet = new Set(allowedDeviceIds);
+  const allowedDeviceIdSet = allowedDeviceIds.length > 0 ? new Set(allowedDeviceIds) : null;
+  const authorizedTopics =
+    allowedDeviceIds.length > 0
+      ? allowedDeviceIds.map((deviceId) => `terrarium/telemetry/${deviceId}`)
+      : [TELEMETRY_WILDCARD_TOPIC];
+  const authorizedConfirmTopics =
+    allowedDeviceIds.length > 0
+      ? allowedDeviceIds.map((deviceId) => `terrarium/confirm/${deviceId}`)
+      : [CONFIRM_WILDCARD_TOPIC];
   const brokerUrl = `mqtts://${host}:${port}`;
 
-  logger.info({ brokerUrl, allowedDeviceIds }, 'Connecting to MQTT broker');
+  logger.info(
+    {
+      brokerUrl,
+      allowedDeviceIds: allowedDeviceIds.length > 0 ? allowedDeviceIds : 'ALL_VALID_OBJECT_IDS',
+    },
+    'Connecting to MQTT broker'
+  );
 
   const mqttClient = mqtt.connect(brokerUrl, buildMqttOptions());
 

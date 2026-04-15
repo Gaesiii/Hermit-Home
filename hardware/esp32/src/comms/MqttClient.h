@@ -8,7 +8,7 @@
  * Design decisions carried over from the original sketch:
  * - espClient.setInsecure()  →  skips TLS cert verification
  * (HiveMQ Cloud on port 8883).
- * - LWT "offline" message published on TOPIC_CONFIRM.
+ * - LWT "offline" message published on user-scoped confirm topic.
  * - Buffer size fixed at 512 bytes (matches original).
  * - Non-blocking reconnect gated by INTERVAL_RECONNECT_MS.
  *
@@ -23,10 +23,11 @@
 
 #pragma once
 
+#include <Arduino.h>
 #include <WiFiClientSecure.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
-#include "config.h"   // All MQTT_* constants, TOPIC_*, INTERVAL_RECONNECT_MS
+#include "config.h"   // MQTT_* constants, INTERVAL_RECONNECT_MS
 
 // Forward-declare the RelayState struct so the header stays
 // independent of the full sensor/actuator headers.
@@ -60,6 +61,20 @@ public:
      * maintainConnection() so it remains non-blocking.
      */
     void init();
+
+    /**
+     * @brief Configure runtime user ID used to build MQTT topics.
+     *
+     * Topics follow:
+     * - terrarium/telemetry/<userId>
+     * - terrarium/commands/<userId>
+     * - terrarium/confirm/<userId>
+     *
+     * If called with a different userId while connected, the client
+     * disconnects so the next maintainConnection() cycle reconnects
+     * and re-subscribes using the new topic set.
+     */
+    void setUserId(const String& userId);
 
     // -----------------------------------------------------------------
     // Runtime (call every loop() iteration)
@@ -101,6 +116,7 @@ public:
      * "lux":         <int>,
      * "sensor_fault": <bool>,
      * "user_override": <bool>,
+     * "user_id": <string>,
      * "relays": {
      * "heater": <bool>, "mist": <bool>,
      * "fan":    <bool>, "light": <bool>
@@ -151,9 +167,16 @@ private:
      * Mirrors reconnectMqtt() from the original sketch:
      * - Guards on WiFi being up.
      * - Connects with LWT, username/password.
-     * - Subscribes to TOPIC_COMMANDS on success.
+     * - Subscribes to commands topic on success.
      *
      * @return true on successful connect.
      */
     bool _reconnect();
+
+private:
+    String _userId;
+    char   _topicTelemetry[96];
+    char   _topicCommands[96];
+    char   _topicConfirm[96];
+    bool   _topicsReady;
 };

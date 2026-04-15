@@ -47,6 +47,7 @@ PriorityController priority(g_config, g_relayState, store);
 bool g_mqttWasConnected = false;
 uint32_t t_lastSensor   = 0;
 uint32_t t_lastPublish  = 0;
+String g_activeUserId;
 
 static inline void enforceMistSafetyLock() {
 #if MIST_SAFETY_LOCK
@@ -109,10 +110,12 @@ void setup() {
     relays.init();
     sensors.init();
     store.loadConfig(g_config);
-    wifi.init();
-
     mqtt.setCallback(mqttCallback);
     mqtt.init();
+
+    wifi.init();
+    g_activeUserId = wifi.getUserId();
+    mqtt.setUserId(g_activeUserId);
 }
 
 // ================================================================
@@ -121,6 +124,13 @@ void setup() {
 void loop() {
     uint32_t now = millis();
     bool prevConnected = g_mqttWasConnected;
+
+    wifi.loop();
+    const String& currentUserId = wifi.getUserId();
+    if (currentUserId != g_activeUserId) {
+        g_activeUserId = currentUserId;
+        mqtt.setUserId(g_activeUserId);
+    }
 
     // ----------------------------------------------------------------
     // 1. MAINTAIN NETWORK (Non-blocking)

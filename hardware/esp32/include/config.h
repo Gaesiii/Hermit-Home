@@ -12,6 +12,9 @@
 #define LIGHT_SDA       20    // BH1750 I2C — SDA (GPIO20, không phải mặc định)
 #define LIGHT_SCL       19    // BH1750 I2C — SCL (GPIO19, không phải mặc định)
 
+// BOOT button (GPIO0): hold for 3 seconds to clear WiFi/user config.
+#define BOOT_PIN        0
+
 // ----------------------------------------------------------------
 //  CHÂN RELAY (Actuator Pins)
 //  Module relay của dự án này kích mức CAO (High-Level Trigger):
@@ -33,11 +36,8 @@
 #define RELAY_OFF(pin)        digitalWrite(pin, LOW)
 #define RELAY_SET(pin, state) ((state) ? RELAY_ON(pin) : RELAY_OFF(pin))
 
-// ----------------------------------------------------------------
-//  CẤU HÌNH WIFI
-// ----------------------------------------------------------------
-#define WIFI_SSID       "Hien"
-#define WIFI_PASSWORD   "khongbiet"
+// Captive-portal AP SSID used when device has no saved WiFi credentials.
+#define WIFI_AP_SSID    "Hermit Home"
 
 // ----------------------------------------------------------------
 //  CẤU HÌNH MQTT — HiveMQ Cloud (TLS port 8883)
@@ -47,12 +47,6 @@
 #define MQTT_USER       "admin"
 #define MQTT_PASS       "Admin1!@"
 #define MQTT_CLIENT_ID  "ESP32_Garden_Phuc_001"
-
-// User ID dùng để tạo topic động (terrarium/<type>/<userId>)
-#define USER_ID         "67c6fd9a9acfdbc1d05c22b1"
-#define TOPIC_TELEMETRY "terrarium/telemetry/" USER_ID
-#define TOPIC_COMMANDS  "terrarium/commands/" USER_ID
-#define TOPIC_CONFIRM   "terrarium/confirm/" USER_ID
 // ----------------------------------------------------------------
 //  KHOẢNG THỜI GIAN VÒNG LẶP (Intervals — milliseconds)
 // ----------------------------------------------------------------

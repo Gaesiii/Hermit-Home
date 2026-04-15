@@ -21,14 +21,18 @@ function getDeviceIdFromConfirmTopic(topic: string): string | null {
   return deviceId;
 }
 
-export function handleConfirm(topic: string, message: Buffer, allowedDeviceIds: ReadonlySet<string>): void {
+export function handleConfirm(
+  topic: string,
+  message: Buffer,
+  allowedDeviceIds: ReadonlySet<string> | null
+): void {
   const deviceId = getDeviceIdFromConfirmTopic(topic);
   if (!deviceId) {
     logger.warn({ topic }, 'Dropped confirm message due to invalid topic format');
     return;
   }
 
-  if (!allowedDeviceIds.has(deviceId)) {
+  if (allowedDeviceIds && !allowedDeviceIds.has(deviceId)) {
     logger.warn({ topic, deviceId }, 'Dropped confirm message from unauthorized topic');
     return;
   }

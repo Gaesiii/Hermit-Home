@@ -2,37 +2,64 @@
  * ================================================================
  * @file    WifiManager.h
  * @brief   WiFi connection management for the Smart Terrarium.
- *
- * Wraps the ESP32 WiFi stack into a clean interface.
- * init() performs a blocking connect with a 15-second timeout —
- * acceptable at boot time; all subsequent status checks via
- * isConnected() are non-blocking.
  * ================================================================
  */
 
 #pragma once
 
+#include <Arduino.h>
 #include <WiFi.h>
+#include <WebServer.h>
+#include <DNSServer.h>
+#include <Preferences.h>
 
 class WifiManager {
 public:
-    /**
-     * @brief Initialise WiFi in STA mode and attempt to connect.
-     *
-     * Reads WIFI_SSID and WIFI_PASSWORD from config.h (must be
-     * defined before this header is included via main.cpp).
-     * Blocks for up to 15 s waiting for an IP address, then
-     * returns whether the connection succeeded.
-     *
-     * @return true  — connected and IP assigned.
-     * @return false — timed out; the sketch will retry via MQTT
-     *                 reconnect logic which guards on isConnected().
-     */
+    WifiManager();
+
+    // Initialise WiFi flow:
+    // - load saved SSID/password/user_id from NVS
+    // - connect in STA mode if present
+    // - otherwise start captive portal AP for phone-based setup
     bool init();
 
-    /**
-     * @brief Non-blocking connection check.
-     * @return true if WiFi.status() == WL_CONNECTED.
-     */
+    // Pump captive portal and BOOT-button reset logic.
+    void loop();
+
+    // Non-blocking connection check.
     bool isConnected() const;
+
+    // user_id configured from captive portal and stored in NVS.
+    const String& getUserId() const;
+
+private:
+    void _loadCredentials();
+    void _saveCredentials(const String& ssid,
+                          const String& password,
+                          const String& userId);
+    bool _connectToWiFi(const String& ssid, const String& password);
+    void _startApPortal();
+    void _stopApPortal();
+    void _configurePortalRoutes();
+    void _checkBootReset();
+    void _clearCredentials();
+
+    // Web handlers
+    void _handleRoot();
+    void _handleConnect();
+    void _handleNotFound();
+
+private:
+    Preferences _prefs;
+    WebServer   _server;
+    DNSServer   _dnsServer;
+
+    bool _portalRoutesConfigured;
+    bool _apModeActive;
+
+    String _ssid;
+    String _password;
+    String _userId;
+
+    uint32_t _bootPressStartMs;
 };

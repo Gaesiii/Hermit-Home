@@ -8,6 +8,7 @@
 #include "MqttClient.h"
 #include <WiFi.h>        // WiFi.status()
 #include <math.h>        // isnan(), round()
+#include <stdio.h>
 
 // Pull in the RelayState definition. Adjust the path to match your
 // project's include structure (it lives in config.h or a shared
@@ -21,8 +22,12 @@
 MqttClient::MqttClient()
     : _mqttClient(_espClient),
       callback(nullptr),
-      _lastReconnectAttemptMs(0)
+      _lastReconnectAttemptMs(0),
+      _topicsReady(false)
 {
+    _topicTelemetry[0] = '\0';
+    _topicCommands[0] = '\0';
+    _topicConfirm[0] = '\0';
 }
 
 // ----------------------------------------------------------------
@@ -59,10 +64,49 @@ void MqttClient::init() {
                   MQTT_BROKER, MQTT_PORT);
 }
 
+void MqttClient::setUserId(const String& userId) {
+    String trimmed = userId;
+    trimmed.trim();
+
+    if (trimmed.isEmpty()) {
+        _userId = "";
+        _topicsReady = false;
+        _topicTelemetry[0] = '\0';
+        _topicCommands[0] = '\0';
+        _topicConfirm[0] = '\0';
+        if (_mqttClient.connected()) {
+            _mqttClient.disconnect();
+        }
+        Serial.println(F("[MQTT] userID is empty. Waiting for portal configuration."));
+        return;
+    }
+
+    if (_userId == trimmed && _topicsReady) {
+        return;
+    }
+
+    _userId = trimmed;
+    snprintf(_topicTelemetry, sizeof(_topicTelemetry), "terrarium/telemetry/%s", _userId.c_str());
+    snprintf(_topicCommands,  sizeof(_topicCommands),  "terrarium/commands/%s",  _userId.c_str());
+    snprintf(_topicConfirm,   sizeof(_topicConfirm),   "terrarium/confirm/%s",   _userId.c_str());
+    _topicsReady = true;
+
+    if (_mqttClient.connected()) {
+        _mqttClient.disconnect();
+    }
+
+    Serial.printf("[MQTT] Runtime topics set for userID=%s\n", _userId.c_str());
+    Serial.printf("[MQTT] Topic commands: %s\n", _topicCommands);
+}
+
 // ----------------------------------------------------------------
 // Public: maintainConnection
 // ----------------------------------------------------------------
 void MqttClient::maintainConnection(bool& wasConnectedFlag) {
+    if (!_topicsReady) {
+        return;
+    }
+
     if (_mqttClient.connected()) {
         // Happy path: pump the client so it handles inbound messages
         // and sends keepalive PINGREQs on time.
@@ -102,7 +146,7 @@ void MqttClient::publishTelemetry(float temperature,
                                          bool  sensorFault,
                                          bool  userOverride,
                                          const RelayState& relays) {
-    if (!_mqttClient.connected()) {
+    if (!_topicsReady || !_mqttClient.connected()) {
         Serial.println(F("[MQTT] publishTelemetry skipped — not connected."));
         return;
     }
@@ -130,6 +174,7 @@ void MqttClient::publishTelemetry(float temperature,
     doc["lux"]           = static_cast<int>(lux);
     doc["sensor_fault"]  = sensorFault;
     doc["user_override"] = userOverride;
+    doc["user_id"]       = _userId;
 
     // --- Relay sub-object ---
     JsonObject relayObj = doc["relays"].to<JsonObject>();
@@ -146,7 +191,7 @@ void MqttClient::publishTelemetry(float temperature,
     Serial.print(F("[MQTT] Publishing telemetry: "));
     Serial.println(buf);
 
-    if (_mqttClient.publish(TOPIC_TELEMETRY, buf, len)) {
+    if (_mqttClient.publish(_topicTelemetry, buf, len)) {
         Serial.println(F("[MQTT] Telemetry published OK."));
     } else {
         Serial.println(F("[MQTT] Telemetry publish FAILED."));
@@ -157,16 +202,17 @@ void MqttClient::publishTelemetry(float temperature,
 // Public: publishConfirmation
 // ----------------------------------------------------------------
 void MqttClient::publishConfirmation(const char* device, bool state) {
-    if (!_mqttClient.connected()) return;
+    if (!_topicsReady || !_mqttClient.connected()) return;
 
     JsonDocument doc;
     doc["event"]  = "override_ack";
     doc["device"] = device;
     doc["state"]  = state;
+    doc["user_id"] = _userId;
 
     char buf[128];
     size_t len = serializeJson(doc, buf, sizeof(buf));
-    _mqttClient.publish(TOPIC_CONFIRM, buf, len);
+    _mqttClient.publish(_topicConfirm, buf, len);
 
     Serial.printf("[MQTT] Confirmation sent → device: %s  state: %s\n",
                   device, state ? "ON" : "OFF");
@@ -183,6 +229,11 @@ bool MqttClient::isConnected() {
 // Private: _reconnect
 // ----------------------------------------------------------------
 bool MqttClient::_reconnect() {
+    if (!_topicsReady) {
+        Serial.println(F("[MQTT] Reconnect skipped — userID/topic not configured."));
+        return false;
+    }
+
     // Guard: don't bother trying if WiFi is down.
     if (WiFi.status() != WL_CONNECTED) {
         Serial.println(F("[MQTT] Reconnect skipped — WiFi not connected."));
@@ -194,7 +245,7 @@ bool MqttClient::_reconnect() {
 
     // Last-Will-and-Testament — broker publishes this automatically
     // if the ESP32 disconnects ungracefully (power loss, crash, etc.).
-    const char* willTopic   = TOPIC_CONFIRM;
+    const char* willTopic   = _topicConfirm;
     const char* willPayload = "{\"status\":\"offline\"}";
     const uint8_t willQos   = 1;
     const bool    willRetain = true;
@@ -213,8 +264,8 @@ bool MqttClient::_reconnect() {
         Serial.println(F("[MQTT] Connected successfully!"));
 
         // Subscribe to the command topic (QoS 1 = at-least-once delivery).
-        _mqttClient.subscribe(TOPIC_COMMANDS, 1);
-        Serial.printf("[MQTT] Subscribed to: %s\n", TOPIC_COMMANDS);
+        _mqttClient.subscribe(_topicCommands, 1);
+        Serial.printf("[MQTT] Subscribed to: %s\n", _topicCommands);
         return true;
     }
 

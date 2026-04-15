@@ -87,7 +87,7 @@ function getDeviceIdFromTopic(topic: string): string | null {
 export async function handleTelemetry(
   topic: string,
   message: Buffer,
-  allowedDeviceIds: ReadonlySet<string>
+  allowedDeviceIds: ReadonlySet<string> | null
 ): Promise<void> {
   const deviceId = getDeviceIdFromTopic(topic);
   if (!deviceId) {
@@ -95,7 +95,7 @@ export async function handleTelemetry(
     return;
   }
 
-  if (!allowedDeviceIds.has(deviceId)) {
+  if (allowedDeviceIds && !allowedDeviceIds.has(deviceId)) {
     logger.warn({ topic, deviceId }, 'Dropped telemetry from unauthorized device topic');
     return;
   }
