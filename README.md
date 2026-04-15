@@ -51,7 +51,7 @@ Tier 2 — AI Agent: autonomous optimization logic
 Tier 3 — Local Failsafe: on-device safety control when cloud is unavailable
 🏗️ System Architecture
 
-<div align="center">
+<!-- <div align="center"> -->
 
          ┌────────────────────┐
          │   Flutter Mobile   │
@@ -83,7 +83,7 @@ Tier 3 — Local Failsafe: on-device safety control when cloud is unavailable
            │    ESP32     │
            └──────────────┘
 
-</div>
+<!-- </div> -->
 
 ✨ Key Features
 🌡️ Real-time environmental monitoring
