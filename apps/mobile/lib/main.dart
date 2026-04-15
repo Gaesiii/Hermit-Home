@@ -6,7 +6,6 @@ import 'core/theme/app_theme.dart';
 import 'features/auth/auth_routes.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/auth/presentation/register_screen.dart';
-import 'features/auth/presentation/user_api_test_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 
 Future<void> main() async {
@@ -34,7 +33,6 @@ class HermitHomeApp extends StatelessWidget {
         AuthRoutes.register: (_) => const RegisterScreen(),
         AuthRoutes.home: (_) => const DashboardScreen(),
         AuthRoutes.dashboard: (_) => const DashboardScreen(),
-        AuthRoutes.apiTest: (_) => const UserApiTestScreen(),
       },
     );
   }

@@ -241,8 +241,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _buildTelemetryCard(),
                   const SizedBox(height: 14),
                   _buildSessionCard(),
-                  const SizedBox(height: 14),
-                  _buildQuickActionsCard(),
                 ],
               ),
             ),
@@ -526,32 +524,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             label: 'API endpoint',
             value: AppConstants.apiBaseUrl,
             isLast: true,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickActionsCard() {
-    return Container(
-      decoration: AppTheme.cardDecoration(radius: 18),
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Quick Actions',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () =>
-                  Navigator.of(context).pushNamed(AuthRoutes.apiTest),
-              icon: const Icon(Icons.bug_report_outlined),
-              label: const Text('Open API Test Screen'),
-            ),
           ),
         ],
       ),
