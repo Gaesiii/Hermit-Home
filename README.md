@@ -95,6 +95,7 @@ Tier 3 — Local Failsafe: on-device safety control when cloud is unavailable
 
 🧩 Tech Stack
 <!-- <div align="center"> -->
+```
 Layer	Technology
 Hardware	ESP32, DHT22, BH1750, Soil Moisture
 Messaging	MQTT, HiveMQ
