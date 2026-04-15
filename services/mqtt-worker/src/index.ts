@@ -63,6 +63,12 @@ function parseAllowedDeviceIds(): string[] {
   return uniqueIds;
 }
 
+function parseBooleanFlag(value: string | undefined): boolean {
+  if (!value) return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+}
+
 function buildMqttOptions(): IClientOptions {
   const username = process.env.MQTT_USER || '';
   const password = process.env.MQTT_PASS || '';
@@ -98,21 +104,36 @@ async function bootstrap(): Promise<void> {
   }
 
   const allowedDeviceIds = parseAllowedDeviceIds();
-  const allowedDeviceIdSet = allowedDeviceIds.length > 0 ? new Set(allowedDeviceIds) : null;
+  const enforceAllowedDeviceIds = parseBooleanFlag(process.env.ENFORCE_ALLOWED_DEVICE_IDS);
+
+  if (!enforceAllowedDeviceIds && allowedDeviceIds.length > 0) {
+    logger.warn(
+      { allowedDeviceIds },
+      'Ignoring ALLOWED_DEVICE_IDS/DEVICE_ID because ENFORCE_ALLOWED_DEVICE_IDS is disabled'
+    );
+  }
+
+  const effectiveAllowedDeviceIds = enforceAllowedDeviceIds ? allowedDeviceIds : [];
+  const allowedDeviceIdSet =
+    effectiveAllowedDeviceIds.length > 0 ? new Set(effectiveAllowedDeviceIds) : null;
   const authorizedTopics =
-    allowedDeviceIds.length > 0
-      ? allowedDeviceIds.map((deviceId) => `terrarium/telemetry/${deviceId}`)
+    effectiveAllowedDeviceIds.length > 0
+      ? effectiveAllowedDeviceIds.map((deviceId) => `terrarium/telemetry/${deviceId}`)
       : [TELEMETRY_WILDCARD_TOPIC];
   const authorizedConfirmTopics =
-    allowedDeviceIds.length > 0
-      ? allowedDeviceIds.map((deviceId) => `terrarium/confirm/${deviceId}`)
+    effectiveAllowedDeviceIds.length > 0
+      ? effectiveAllowedDeviceIds.map((deviceId) => `terrarium/confirm/${deviceId}`)
       : [CONFIRM_WILDCARD_TOPIC];
   const brokerUrl = `mqtts://${host}:${port}`;
 
   logger.info(
     {
       brokerUrl,
-      allowedDeviceIds: allowedDeviceIds.length > 0 ? allowedDeviceIds : 'ALL_VALID_OBJECT_IDS',
+      enforceAllowedDeviceIds,
+      allowedDeviceIds:
+        effectiveAllowedDeviceIds.length > 0
+          ? effectiveAllowedDeviceIds
+          : 'ALL_VALID_OBJECT_IDS',
     },
     'Connecting to MQTT broker'
   );

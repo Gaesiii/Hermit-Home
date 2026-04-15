@@ -84,6 +84,24 @@ function getDeviceIdFromTopic(topic: string): string | null {
   return deviceId;
 }
 
+function getPayloadUserId(payload: unknown): string | null {
+  if (!isPlainObject(payload)) {
+    return null;
+  }
+
+  const value = payload.user_id;
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!MONGO_OBJECT_ID_REGEX.test(trimmed)) {
+    return null;
+  }
+
+  return trimmed;
+}
+
 export async function handleTelemetry(
   topic: string,
   message: Buffer,
@@ -113,6 +131,14 @@ export async function handleTelemetry(
     if (!isValidTelemetryPayload(parsed)) {
       logger.warn({ topic, deviceId }, 'Dropped telemetry with invalid schema');
       return;
+    }
+
+    const payloadUserId = getPayloadUserId(parsed);
+    if (payloadUserId && payloadUserId !== deviceId) {
+      logger.warn(
+        { topic, deviceId, payloadUserId },
+        'Telemetry topic userId and payload user_id mismatch; using topic userId'
+      );
     }
 
     await insertTelemetry(deviceId, parsed);
