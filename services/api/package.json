@@ -8,12 +8,14 @@
   "dependencies": {
     "@smart-terrarium/shared-types": "file:../../packages/shared-types",
     "@types/bcryptjs": "^2.4.6",
+    "@types/nodemailer": "^8.0.0",
     "bcryptjs": "^3.0.3",
     "dotenv": "^16.4.5",
     "firebase-admin": "^12.0.0",
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.5.0",
     "mqtt": "^5.5.5",
+    "nodemailer": "^8.0.5",
     "pino": "^8.20.0"
   },
   "devDependencies": {

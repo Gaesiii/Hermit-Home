@@ -86,6 +86,10 @@ Get Status: GET http://localhost:3000/api/devices/{deviceId}/status
 
 Send Command: POST http://localhost:3000/api/devices/{deviceId}/override
 
+Forgot Password: POST http://localhost:3000/api/users/forgot-password
+
+Reset Password: POST http://localhost:3000/api/users/reset-password
+
 JSON
 {
   "user_override": true,

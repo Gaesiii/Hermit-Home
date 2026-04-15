@@ -63,15 +63,15 @@ export default async function handler(
       updatedAt: now,
     });
 
-    const createdUser = await users.findOne({ _id: result.insertedId });
-    if (!createdUser) {
-      res.status(500).json({ error: 'Failed to load the created account.' });
-      return;
-    }
-
     res.status(201).json({
       message: 'Account created successfully.',
-      user: toPublicUser(createdUser),
+      user: toPublicUser({
+        _id: result.insertedId,
+        email,
+        passwordHash,
+        createdAt: now,
+        updatedAt: now,
+      }),
     });
   } catch (error: unknown) {
     const code =

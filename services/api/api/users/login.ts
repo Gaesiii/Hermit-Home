@@ -63,6 +63,15 @@ export default async function handler(
       return;
     }
 
+    if (!user._id || !user.passwordHash || typeof user.passwordHash !== 'string') {
+      console.error('[POST /api/users/login] Invalid user record schema', {
+        userId: user._id?.toString?.(),
+        email: user.email,
+      });
+      res.status(500).json({ error: 'Server authentication is not configured.' });
+      return;
+    }
+
     const isValid = await verifyPassword(password, user.passwordHash);
     if (!isValid) {
       res.status(401).json({ error: INVALID_CREDENTIALS });
