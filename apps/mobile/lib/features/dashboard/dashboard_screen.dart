@@ -3,7 +3,6 @@ import 'dart:ui';
 import 'dart:math';
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/services/auth_service.dart';
@@ -37,10 +36,10 @@ class _DashboardScreenState extends State<DashboardScreen>
   bool _isSyncingData = false;
 
   // --- BIẾN STATE CHO TAB HỒ SƠ ---
-  String _userName = 'Đang tải...';
-  String? _profileUserId;
+  String _userEmail = "Đang tải...";
+  String _userName = "Đang tải...";
 
-  // --- BIẾN STATE CHO TAB LỊCH SỬ (ĐÃ ĐỔI SANG CHO PHÉP CHỨA GIÁ TRỊ NULL) ---
+  // --- BIẾN STATE CHO TAB LỊCH SỬ ---
   double? _currentTemp;
   double? _currentHum;
   List<double?> _tempHistory = [];
@@ -59,8 +58,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   String _selectedInterval = '1m';
 
   List<Map<String, dynamic>> _tableData = [];
-  int _currentPage = 1;
   bool _isLoadingMore = false;
+  int _currentLimit = 10; // Biến lưu số lượng bản ghi cần tải
 
   // --- BIẾN STATE THIẾT BỊ ---
   bool isLightOn = false;
@@ -90,12 +89,11 @@ class _DashboardScreenState extends State<DashboardScreen>
         duration: const Duration(milliseconds: 1000),
         value: _isCurrentlyDark ? 1.0 : 0.0);
 
+    // Lắng nghe sự kiện cuộn để tải thêm
     _historyScrollController.addListener(() {
       if (_historyScrollController.position.pixels >=
-          _historyScrollController.position.maxScrollExtent + 40) {
-        if (!_isLoadingMore && !_isSyncingData) {
-          _syncDataFromDatabase(isLoadMore: true);
-        }
+          _historyScrollController.position.maxScrollExtent - 50) {
+        _loadMoreData();
       }
     });
 
@@ -115,19 +113,22 @@ class _DashboardScreenState extends State<DashboardScreen>
     super.dispose();
   }
 
+  // Hàm tải thêm dữ liệu khi cuộn xuống đáy
+  Future<void> _loadMoreData() async {
+    if (_isLoadingMore || _isSyncingData) return;
+
+    setState(() {
+      _isLoadingMore = true;
+      _currentLimit += 10;
+    });
+
+    await _syncDataFromDatabase(resetPagination: false);
+  }
+
   // Lấy User từ Token hoặc DB
-  // ===========================================================================
-  // HÀM BẺ KHÓA TOKEN (JWT DECODE) LẤY EMAIL TRỰC TIẾP
-  // ===========================================================================
   Future<void> _loadUserProfile() async {
     try {
       final token = await _authService.getToken();
-      final storedUserId = (await _authService.getUserId())?.trim();
-
-      if (storedUserId != null && storedUserId.isNotEmpty && mounted) {
-        setState(() => _profileUserId = storedUserId);
-      }
-
       if (token != null && token.isNotEmpty) {
         final parts = token.split('.');
         if (parts.length == 3) {
@@ -135,14 +136,15 @@ class _DashboardScreenState extends State<DashboardScreen>
           while (payload.length % 4 != 0) {
             payload += '=';
           }
-
           final decodedPayload = utf8.decode(base64Url.decode(payload));
           final payloadMap = jsonDecode(decodedPayload);
+
           final emailExtracted =
-              payloadMap['email']?.toString() ?? 'phuc@hermit-home.com';
+              payloadMap['email']?.toString() ?? "phuc@hermit-home.com";
 
           if (mounted) {
             setState(() {
+              _userEmail = emailExtracted;
               _userName = emailExtracted.split('@')[0];
             });
           }
@@ -150,27 +152,28 @@ class _DashboardScreenState extends State<DashboardScreen>
         }
       }
 
-      if (storedUserId != null && token != null) {
-        final url =
-            Uri.parse('${AppConstants.apiBaseUrl}/api/users/$storedUserId');
+      final userId = await _authService.getUserId();
+      if (userId != null && token != null) {
+        final url = Uri.parse('${AppConstants.apiBaseUrl}/api/users/$userId');
         final response =
             await http.get(url, headers: {'Authorization': 'Bearer $token'});
-
         if (response.statusCode == 200) {
           final emailFromDB = jsonDecode(response.body)['email']?.toString() ??
-              'phuc@hermit-home.com';
+              "phuc@hermit-home.com";
           if (mounted) {
             setState(() {
+              _userEmail = emailFromDB;
               _userName = emailFromDB.split('@')[0];
             });
           }
         }
       }
     } catch (e) {
-      debugPrint('Lỗi tải thông tin: $e');
+      debugPrint("Lỗi tải thông tin: $e");
       if (mounted) {
         setState(() {
-          _userName = 'Phúc';
+          _userEmail = "phuc@hermit-home.com";
+          _userName = "Phúc";
         });
       }
     }
@@ -179,10 +182,11 @@ class _DashboardScreenState extends State<DashboardScreen>
   void _setThemeMode(AppThemeMode mode) {
     if (_currentThemeMode == mode) return;
     setState(() => _currentThemeMode = mode);
-    if (_isCurrentlyDark)
+    if (_isCurrentlyDark) {
       _themeController.forward();
-    else
+    } else {
       _themeController.reverse();
+    }
   }
 
   void _onTabTapped(int index) {
@@ -198,206 +202,146 @@ class _DashboardScreenState extends State<DashboardScreen>
     Navigator.pushReplacementNamed(context, '/login');
   }
 
-  Future<void> _copyProfileUserId() async {
-    final userId = _profileUserId?.trim();
-    if (userId == null || userId.isEmpty) {
-      return;
-    }
+  Future<void> _syncDataFromDatabase({bool resetPagination = false}) async {
+    if (_isSyncingData) return;
 
-    await Clipboard.setData(ClipboardData(text: userId));
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Đã copy User ID'),
-        duration: Duration(milliseconds: 1200),
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // GỌI API & LỌC DATA (KÈM PADDING NULL CHO BIỂU ĐỒ)
-  // ===========================================================================
-  Future<void> _syncDataFromDatabase(
-      {bool resetPagination = false, bool isLoadMore = false}) async {
-    if (_isSyncingData || _isLoadingMore) return;
-
-    if (isLoadMore) {
-      setState(() => _isLoadingMore = true);
-      _currentPage++;
-    } else {
-      setState(() {
-        _isSyncingData = true;
-        if (resetPagination) {
-          _currentPage = 1;
-          _tempHistory.clear();
-          _humHistory.clear();
-          _timeHistory.clear();
-          _tableData.clear();
-        }
-      });
-    }
+    setState(() {
+      _isSyncingData = true;
+      if (resetPagination) {
+        _currentLimit = 10;
+        _tempHistory.clear();
+        _humHistory.clear();
+        _timeHistory.clear();
+        _tableData.clear();
+      }
+    });
 
     try {
       final token = await _authService.getToken();
       final userId = await _authService.getUserId();
-      if (token == null || userId == null)
-        throw Exception("Xác thực thất bại.");
-
-      if (!isLoadMore) {
-        final controlSnapshot =
-            await _controlRepo.fetchCurrentState(userId: userId, token: token);
-        if (mounted) {
-          setState(() {
-            isLightOn = controlSnapshot.state.light;
-            isHeatOn = controlSnapshot.state.heater;
-            isMistOn = controlSnapshot.state.mist;
-            isFanOn = controlSnapshot.state.fan;
-          });
-        }
+      if (token == null || userId == null) {
+        throw Exception('Xac thuc that bai.');
       }
 
-      int intervalMins = 1;
-      switch (_selectedInterval) {
-        case '5m':
-          intervalMins = 5;
-          break;
-        case '10m':
-          intervalMins = 10;
-          break;
-        case '30m':
-          intervalMins = 30;
-          break;
-        case '1h':
-          intervalMins = 60;
-          break;
-        case '6h':
-          intervalMins = 360;
-          break;
+      final controlSnapshot =
+          await _controlRepo.fetchCurrentState(userId: userId, token: token);
+      if (mounted) {
+        setState(() {
+          isLightOn = controlSnapshot.state.light;
+          isHeatOn = controlSnapshot.state.heater;
+          isMistOn = controlSnapshot.state.mist;
+          isFanOn = controlSnapshot.state.fan;
+        });
       }
-
-      int limitToFetch = 10 * intervalMins;
-      if (limitToFetch > 150) limitToFetch = 150;
-      if (limitToFetch < 10) limitToFetch = 10;
 
       final telemetryUrl = Uri.parse(
-          '${AppConstants.apiBaseUrl}/api/devices/$userId/telemetry?page=$_currentPage&limit=$limitToFetch');
-
+          '${AppConstants.apiBaseUrl}/api/devices/$userId/telemetry?limit=$_currentLimit');
       final teleResponse = await http.get(telemetryUrl, headers: {
         'Authorization': 'Bearer $token',
         'Accept': 'application/json',
       });
 
-      if (teleResponse.statusCode == 200) {
-        final decoded = jsonDecode(teleResponse.body);
-        final teleList = decoded['telemetry'] as List?;
+      if (teleResponse.statusCode != 200) {
+        throw Exception(
+            'Khong the tai telemetry (HTTP ${teleResponse.statusCode}).');
+      }
 
-        if (teleList != null && teleList.isNotEmpty) {
-          String? telemetryUserId;
-          for (final record in teleList) {
-            if (record is! Map) continue;
-            final parsedUserId = record['userId']?.toString().trim();
-            if (parsedUserId != null && parsedUserId.isNotEmpty) {
-              telemetryUserId = parsedUserId;
-              break;
-            }
-          }
+      final decoded = jsonDecode(teleResponse.body) as Map<String, dynamic>;
+      final teleList = decoded['telemetry'] as List?;
+      final rows = <Map<String, dynamic>>[];
 
-          final newTableRows = <Map<String, dynamic>>[];
-          DateTime? lastAddedTime;
+      if (teleList != null) {
+        for (final entry in teleList.whereType<Map<String, dynamic>>()) {
+          if (entry['userId']?.toString() != userId) continue;
 
-          for (var t in teleList) {
-            final rawTime = t['timestamp'] ?? t['createdAt'];
-            if (rawTime == null) continue;
+          final rawTime = entry['timestamp'] ?? entry['createdAt'];
+          if (rawTime == null) continue;
 
-            try {
-              final date = DateTime.parse(rawTime.toString()).toLocal();
+          final parsedTime = DateTime.tryParse(rawTime.toString());
+          if (parsedTime == null) continue;
+          final localTime = parsedTime.toLocal();
 
-              if (lastAddedTime == null ||
-                  lastAddedTime.difference(date).inMinutes.abs() >=
-                      intervalMins) {
-                final tempVal = (t['temperature'] as num).toDouble();
-                final humVal = (t['humidity'] as num).toDouble();
+          final tempVal = _toNullableDouble(entry['temperature']);
+          final humVal = _toNullableDouble(entry['humidity']);
 
-                final formattedTime =
-                    '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-                final formattedDate =
-                    '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}';
-
-                newTableRows.add({
-                  'temp': tempVal,
-                  'hum': humVal,
-                  'time': formattedTime,
-                  'date': formattedDate,
-                });
-                lastAddedTime = date;
-                if (newTableRows.length >= 10) break;
-              }
-            } catch (e) {
-              continue;
-            }
-          }
-
-          if (mounted) {
-            setState(() {
-              if (telemetryUserId != null) {
-                _profileUserId = telemetryUserId;
-              }
-
-              if (!isLoadMore) {
-                final chartList =
-                    newTableRows.take(6).toList().reversed.toList();
-
-                final temps = <double?>[];
-                final hums = <double?>[];
-                final times = <String>[];
-
-                for (var row in chartList) {
-                  temps.add(row['temp']);
-                  hums.add(row['hum']);
-                  times.add(row['time']);
-                }
-
-                // THUẬT TOÁN ĐIỀN ĐỦ 6 CỘT: Nhét null và --:-- vào đầu mảng nếu thiếu
-                while (temps.length < 6) {
-                  temps.insert(0, null);
-                  hums.insert(0, null);
-                  times.insert(0, "--:--");
-                }
-
-                _tempHistory = temps;
-                _humHistory = hums;
-                _timeHistory = times;
-
-                if (newTableRows.isNotEmpty) {
-                  _currentTemp = newTableRows.first['temp'];
-                  _currentHum = newTableRows.first['hum'];
-                }
-                _tableData = newTableRows;
-              } else {
-                _tableData.addAll(newTableRows);
-              }
-            });
-          }
+          rows.add({
+            'timestamp': localTime,
+            'temp': tempVal,
+            'hum': humVal,
+            'time':
+                '${localTime.hour.toString().padLeft(2, '0')}:${localTime.minute.toString().padLeft(2, '0')}:${localTime.second.toString().padLeft(2, '0')}',
+            'date':
+                '${localTime.day.toString().padLeft(2, '0')}/${localTime.month.toString().padLeft(2, '0')}/${localTime.year}',
+          });
         }
       }
-      if (mounted && !isLoadMore) {
+
+      rows.sort((a, b) =>
+          (b['timestamp'] as DateTime).compareTo(a['timestamp'] as DateTime));
+      final latestRows = rows.take(_currentLimit).toList(growable: false);
+
+      // Lấy 10 phần tử mới nhất để vẽ biểu đồ
+      final chartSourceRows =
+          latestRows.take(5).toList().reversed.toList(growable: false);
+
+      final temps = chartSourceRows
+          .map<double?>((row) => row['temp'] as double?)
+          .toList();
+      final hums =
+          chartSourceRows.map<double?>((row) => row['hum'] as double?).toList();
+      final times =
+          chartSourceRows.map<String>((row) => row['time'] as String).toList();
+
+      while (temps.length < 5) {
+        temps.insert(0, null);
+        hums.insert(0, null);
+        times.insert(0, '--:--:--');
+      }
+
+      if (mounted) {
+        setState(() {
+          _tempHistory = temps;
+          _humHistory = hums;
+          _timeHistory = times;
+          _tableData = latestRows;
+
+          if (latestRows.isNotEmpty) {
+            _currentTemp = latestRows.first['temp'] as double?;
+            _currentHum = latestRows.first['hum'] as double?;
+          } else {
+            _currentTemp = null;
+            _currentHum = null;
+          }
+        });
+      }
+
+      if (mounted && resetPagination) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text("Đã cập nhật dữ liệu!"),
-            duration: Duration(milliseconds: 800)));
+          content: Text('Đã cập nhật dữ liệu mới.'),
+          duration: Duration(milliseconds: 900),
+        ));
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text("Lỗi đồng bộ: $e"),
+            content: Text('Lỗi đồng bộ: $e'),
             backgroundColor: Colors.redAccent));
+      }
     } finally {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _isSyncingData = false;
           _isLoadingMore = false;
         });
+      }
     }
+  }
+
+  double? _toNullableDouble(Object? value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
   }
 
   Future<void> _toggleDevice(String deviceKey, bool enabled) async {
@@ -453,18 +397,23 @@ class _DashboardScreenState extends State<DashboardScreen>
                     borderRadius: BorderRadius.circular(30),
                     border: Border.all(color: glassBorder, width: 1.5),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(title,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.2)),
-                      const SizedBox(height: 25),
-                      content,
-                    ],
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(title,
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.2)),
+                        ),
+                        const SizedBox(height: 25),
+                        content,
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -480,26 +429,34 @@ class _DashboardScreenState extends State<DashboardScreen>
       builder: (context, child) {
         double t = _themeController.value;
 
+        // BẢNG MÀU ĐÃ CẬP NHẬT
         Color bgCenter =
-            Color.lerp(const Color(0xFF56CCF2), const Color(0xFF002D5E), t)!;
+            Color.lerp(const Color(0xFFE1F5FE), const Color(0xFF002D5E), t)!;
         Color bgEdge =
-            Color.lerp(const Color(0xFF2F80ED), const Color(0xFF000B18), t)!;
-        Color wave1 = Color.lerp(Colors.white.withOpacity(0.5),
-            const Color(0xFF006DFF).withOpacity(0.2), t)!;
-        Color wave2 = Color.lerp(Colors.white.withOpacity(0.3),
-            const Color(0xFF00D2FF).withOpacity(0.15), t)!;
-        Color wave3 = Color.lerp(Colors.white.withOpacity(0.1),
-            const Color(0xFF00F2FF).withOpacity(0.1), t)!;
-        Color particleColor = Color.lerp(Colors.white.withOpacity(0.7),
-            Colors.cyanAccent.withOpacity(0.25), t)!;
-        Color accentColor =
-            Color.lerp(const Color(0xFFFF8C00), const Color(0xFF00D2FF), t)!;
+            Color.lerp(const Color(0xFF4FC3F7), const Color(0xFF000B18), t)!;
 
+        Color wave1 = Color.lerp(Colors.white.withOpacity(0.6),
+            const Color(0xFF006DFF).withOpacity(0.2), t)!;
+        Color wave2 = Color.lerp(Colors.white.withOpacity(0.4),
+            const Color(0xFF00D2FF).withOpacity(0.15), t)!;
+        Color wave3 = Color.lerp(Colors.white.withOpacity(0.2),
+            const Color(0xFF00F2FF).withOpacity(0.1), t)!;
+
+        Color particleColor = Color.lerp(
+            const Color(0xFF0288D1).withOpacity(0.4),
+            Colors.cyanAccent.withOpacity(0.25),
+            t)!;
+        Color accentColor =
+            Color.lerp(const Color(0xFFE65100), const Color(0xFF00D2FF), t)!;
+
+        // TEXT BAN NGÀY SẼ DÙNG MÀU TỐI, BAN ĐÊM DÙNG MÀU SÁNG
+        Color textMain = Color.lerp(const Color(0xFF001E36), Colors.white, t)!;
+
+        // NỀN KÍNH BAN NGÀY ĐỤC HƠN
         Color glassBg = Color.lerp(
-            Colors.white.withOpacity(0.25), Colors.white.withOpacity(0.08), t)!;
+            Colors.white.withOpacity(0.55), Colors.white.withOpacity(0.08), t)!;
         Color glassBorder = Color.lerp(
-            Colors.white.withOpacity(0.6), Colors.white.withOpacity(0.15), t)!;
-        Color textMain = Colors.white;
+            Colors.white.withOpacity(0.9), Colors.white.withOpacity(0.15), t)!;
 
         return Scaffold(
           backgroundColor: bgEdge,
@@ -511,8 +468,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                           center: Alignment.topLeft,
                           radius: 1.5,
                           colors: [bgCenter, bgEdge]))),
-
-              // ĐÃ FIX BỌT BIỂN: Đặt CustomPaint vào bên trong AnimatedBuilder để nó liên tục được vẽ lại
               AnimatedBuilder(
                 animation: _particleController,
                 builder: (context, child) => CustomPaint(
@@ -522,7 +477,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                   child: Container(),
                 ),
               ),
-
               AnimatedBuilder(
                 animation: _bgController,
                 builder: (context, child) => Stack(
@@ -542,19 +496,26 @@ class _DashboardScreenState extends State<DashboardScreen>
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            _currentIndex == 0
-                                ? "Lịch Sử Bể"
-                                : _currentIndex == 1
-                                    ? "Hang Chính"
-                                    : "Hồ Sơ",
-                            style: TextStyle(
-                                color: textMain,
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.2),
+                          Expanded(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                _currentIndex == 0
+                                    ? "Lịch Sử Bể"
+                                    : _currentIndex == 1
+                                        ? "Hang Chính"
+                                        : "Hồ Sơ",
+                                style: TextStyle(
+                                    color: textMain,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.2),
+                              ),
+                            ),
                           ),
-                          _buildDraggableThemeToggle(accentColor),
+                          const SizedBox(width: 10),
+                          _buildDraggableThemeToggle(accentColor, textMain),
                         ],
                       ),
                     ),
@@ -579,7 +540,8 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
               Align(
                 alignment: Alignment.bottomCenter,
-                child: _buildGlassBottomNav(glassBg, glassBorder, accentColor),
+                child: _buildGlassBottomNav(
+                    glassBg, glassBorder, accentColor, textMain),
               ),
             ],
           ),
@@ -591,94 +553,103 @@ class _DashboardScreenState extends State<DashboardScreen>
   // --- TAB 0: LỊCH SỬ (HISTORY) ---
   Widget _buildHistoryTab(
       Color glassBg, Color glassBorder, Color textMain, Color accentColor) {
-    // Truyền trực tiếp list có chứa null vào vẽ
-    return SingleChildScrollView(
-      controller: _historyScrollController,
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.only(left: 20, right: 20, bottom: 100),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 10),
-          Text("Lọc dữ liệu",
-              style: TextStyle(color: textMain.withOpacity(0.8), fontSize: 14)),
-          const SizedBox(height: 10),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: List.generate(_intervalKeys.length, (index) {
-                final key = _intervalKeys[index];
-                final label = _intervalLabels[index];
-                final isSelected = _selectedInterval == key;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 10),
-                  child: GestureDetector(
-                    onTap: () {
-                      if (_selectedInterval != key) {
-                        setState(() => _selectedInterval = key);
-                        _syncDataFromDatabase(resetPagination: true);
-                      }
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color:
-                            isSelected ? accentColor.withOpacity(0.3) : glassBg,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                            color: isSelected ? accentColor : glassBorder,
-                            width: 1),
-                      ),
-                      child: Text(
-                        label,
-                        style: TextStyle(
-                            color: isSelected
-                                ? Colors.white
-                                : textMain.withOpacity(0.7),
-                            fontWeight: isSelected
-                                ? FontWeight.bold
-                                : FontWeight.normal),
+    return RefreshIndicator(
+      color: accentColor,
+      backgroundColor: const Color(0xFF001A33),
+      onRefresh: () async {
+        await _syncDataFromDatabase(resetPagination: true);
+      },
+      child: SingleChildScrollView(
+        controller: _historyScrollController,
+        physics:
+            const AlwaysScrollableScrollPhysics(), // Đảm bảo luôn cuộn được để pull-to-refresh hoạt động
+        padding: const EdgeInsets.only(left: 20, right: 20, bottom: 100),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 10),
+            Text("Lọc dữ liệu",
+                style:
+                    TextStyle(color: textMain.withOpacity(0.8), fontSize: 14)),
+            const SizedBox(height: 10),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: List.generate(_intervalKeys.length, (index) {
+                  final key = _intervalKeys[index];
+                  final label = _intervalLabels[index];
+                  final isSelected = _selectedInterval == key;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: GestureDetector(
+                      onTap: () {
+                        if (_selectedInterval != key) {
+                          setState(() => _selectedInterval = key);
+                          _syncDataFromDatabase(resetPagination: true);
+                        }
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? accentColor.withOpacity(0.3)
+                              : glassBg,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                              color: isSelected ? accentColor : glassBorder,
+                              width: 1),
+                        ),
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                              color: isSelected
+                                  ? textMain
+                                  : textMain.withOpacity(0.7),
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal),
+                        ),
                       ),
                     ),
-                  ),
-                );
-              }),
-            ),
-          ),
-          const SizedBox(height: 20),
-          _buildChartCard("Biến Động Nhiệt Độ", "°C", accentColor, glassBg,
-              glassBorder, textMain, _tempHistory, _timeHistory),
-          const SizedBox(height: 20),
-          _buildChartCard("Biến Động Độ Ẩm", "%", const Color(0xFF00D2FF),
-              glassBg, glassBorder, textMain, _humHistory, _timeHistory),
-          const SizedBox(height: 30),
-          Text("Chi Tiết Thông Số",
-              style: TextStyle(
-                  color: textMain,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2)),
-          const SizedBox(height: 15),
-          _buildDataTable(glassBg, glassBorder, textMain, accentColor),
-          if (_isLoadingMore)
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Center(
-                  child: CircularProgressIndicator(
-                      color: accentColor, strokeWidth: 2)),
-            ),
-          if (!_isLoadingMore && _tableData.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Center(
-                child: Text("Vuốt lên để tải thêm",
-                    style: TextStyle(
-                        color: textMain.withOpacity(0.4), fontSize: 12)),
+                  );
+                }),
               ),
-            )
-        ],
+            ),
+            const SizedBox(height: 20),
+            _buildChartCard("Biến Động Nhiệt Độ", "°C", accentColor, glassBg,
+                glassBorder, textMain, _tempHistory, _timeHistory),
+            const SizedBox(height: 20),
+            _buildChartCard("Biến Động Độ Ẩm", "%", const Color(0xFF0288D1),
+                glassBg, glassBorder, textMain, _humHistory, _timeHistory),
+            const SizedBox(height: 30),
+            Text("Chi Tiết Thông Số",
+                style: TextStyle(
+                    color: textMain,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2)),
+            const SizedBox(height: 15),
+            _buildDataTable(glassBg, glassBorder, textMain, accentColor),
+            if (_isLoadingMore)
+              Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Center(
+                    child: CircularProgressIndicator(
+                        color: accentColor, strokeWidth: 2)),
+              ),
+            if (_tableData.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: Center(
+                  child: Text("Đang hiển thị $_currentLimit bản ghi",
+                      style: TextStyle(
+                          color: textMain.withOpacity(0.6), fontSize: 12)),
+                ),
+              )
+          ],
+        ),
       ),
     );
   }
@@ -718,31 +689,38 @@ class _DashboardScreenState extends State<DashboardScreen>
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
                 decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.05),
+                    color: textMain.withOpacity(0.05),
                     border: Border(bottom: BorderSide(color: glassBorder))),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Expanded(
                         flex: 2,
-                        child: Text("Thời gian",
-                            style: TextStyle(
-                                color: textMain.withOpacity(0.7),
-                                fontWeight: FontWeight.bold))),
+                        child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text("Thời gian",
+                                style: TextStyle(
+                                    color: textMain.withOpacity(0.8),
+                                    fontWeight: FontWeight.bold)))),
                     Expanded(
                         flex: 1,
-                        child: Text("Nhiệt",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                                color: textMain.withOpacity(0.7),
-                                fontWeight: FontWeight.bold))),
+                        child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.center,
+                            child: Text("Nhiệt",
+                                style: TextStyle(
+                                    color: textMain.withOpacity(0.8),
+                                    fontWeight: FontWeight.bold)))),
                     Expanded(
                         flex: 1,
-                        child: Text("Ẩm",
-                            textAlign: TextAlign.right,
-                            style: TextStyle(
-                                color: textMain.withOpacity(0.7),
-                                fontWeight: FontWeight.bold))),
+                        child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerRight,
+                            child: Text("Ẩm",
+                                style: TextStyle(
+                                    color: textMain.withOpacity(0.8),
+                                    fontWeight: FontWeight.bold)))),
                   ],
                 ),
               ),
@@ -752,6 +730,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                 itemCount: _tableData.length,
                 itemBuilder: (context, index) {
                   final item = _tableData[index];
+                  final tempValue = item['temp'] as double?;
+                  final humValue = item['hum'] as double?;
+                  final tempText = tempValue != null
+                      ? '${tempValue.toStringAsFixed(1)}°C'
+                      : '--';
+                  final humText = humValue != null
+                      ? '${humValue.toStringAsFixed(1)}%'
+                      : '--';
                   return Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 20, vertical: 15),
@@ -767,30 +753,40 @@ class _DashboardScreenState extends State<DashboardScreen>
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(item['date'],
-                                    style: TextStyle(
-                                        color: textMain,
-                                        fontWeight: FontWeight.bold)),
-                                Text(item['time'],
-                                    style: TextStyle(
-                                        color: textMain.withOpacity(0.5),
-                                        fontSize: 11)),
+                                FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(item['date'],
+                                        style: TextStyle(
+                                            color: textMain,
+                                            fontWeight: FontWeight.bold))),
+                                FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(item['time'],
+                                        style: TextStyle(
+                                            color: textMain.withOpacity(0.6),
+                                            fontSize: 11))),
                               ],
                             )),
                         Expanded(
                             flex: 1,
-                            child: Text("${item['temp']}°C",
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                    color: accentColor,
-                                    fontWeight: FontWeight.w600))),
+                            child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.center,
+                                child: Text(tempText,
+                                    style: TextStyle(
+                                        color: accentColor,
+                                        fontWeight: FontWeight.w600)))),
                         Expanded(
                             flex: 1,
-                            child: Text("${item['hum']}%",
-                                textAlign: TextAlign.right,
-                                style: const TextStyle(
-                                    color: Color(0xFF00D2FF),
-                                    fontWeight: FontWeight.w600))),
+                            child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerRight,
+                                child: Text(humText,
+                                    style: const TextStyle(
+                                        color: Color(0xFF0288D1),
+                                        fontWeight: FontWeight.w600)))),
                       ],
                     ),
                   );
@@ -825,11 +821,14 @@ class _DashboardScreenState extends State<DashboardScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("$title ($unit)",
-                  style: TextStyle(
-                      color: textMain,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold)),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text("$title ($unit)",
+                    style: TextStyle(
+                        color: textMain,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold)),
+              ),
               const SizedBox(height: 25),
               SizedBox(
                 height: 160,
@@ -839,7 +838,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                       data: data,
                       timeLabels: times,
                       unit: unit,
-                      lineColor: lineColor),
+                      lineColor: lineColor,
+                      textColor: textMain),
                 ),
               ),
             ],
@@ -877,16 +877,24 @@ class _DashboardScreenState extends State<DashboardScreen>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text("Thông số hiện tại",
-                            style: TextStyle(
-                                color: textMain.withOpacity(0.8),
-                                fontSize: 14)),
+                        Expanded(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text("Thông số hiện tại",
+                                style: TextStyle(
+                                    color: textMain.withOpacity(0.8),
+                                    fontSize: 14)),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
                         GestureDetector(
                           onTap: _isSyncingData
                               ? null
                               : () =>
                                   _syncDataFromDatabase(resetPagination: true),
                           child: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               if (_isSyncingData)
                                 SizedBox(
@@ -915,14 +923,18 @@ class _DashboardScreenState extends State<DashboardScreen>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _buildTelemetryItem(Icons.thermostat_rounded,
-                            "Nhiệt Độ", tempStr, "°C", accentColor, textMain),
+                        Expanded(
+                          child: _buildTelemetryItem(Icons.thermostat_rounded,
+                              "Nhiệt Độ", tempStr, "°C", accentColor, textMain),
+                        ),
                         Container(
                             width: 1,
                             height: 50,
-                            color: Colors.white.withOpacity(0.2)),
-                        _buildTelemetryItem(Icons.water_drop_rounded, "Độ Ẩm",
-                            humStr, "%", accentColor, textMain),
+                            color: textMain.withOpacity(0.2)),
+                        Expanded(
+                          child: _buildTelemetryItem(Icons.water_drop_rounded,
+                              "Độ Ẩm", humStr, "%", accentColor, textMain),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 25),
@@ -1018,11 +1030,14 @@ class _DashboardScreenState extends State<DashboardScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("Trợ lý AI:",
-                    style: TextStyle(
-                        color: textMain.withOpacity(0.7),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600)),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text("Trợ lý AI:",
+                      style: TextStyle(
+                          color: textMain.withOpacity(0.8),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600)),
+                ),
                 const SizedBox(height: 4),
                 Text(
                     "Mọi thứ đều ổn định! Vi khí hậu hiện tại rất hoàn hảo cho bầy cư dân của bạn.",
@@ -1041,10 +1056,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       Color glassBg, Color glassBorder, Color textMain, Color accentColor) {
     final displayName =
         _userName.isNotEmpty ? "Tộc Trưởng $_userName" : "Đang tải...";
-    final profileUserId = (_profileUserId ?? '').trim();
-    final hasProfileUserId = profileUserId.isNotEmpty;
-    final profileIdentifier =
-        hasProfileUserId ? profileUserId : 'Đang tải User ID...';
     return SingleChildScrollView(
       padding: const EdgeInsets.only(left: 20, right: 20, bottom: 100),
       child: Column(
@@ -1074,44 +1085,23 @@ class _DashboardScreenState extends State<DashboardScreen>
                           Icon(Icons.person_rounded, size: 50, color: textMain),
                     ),
                     const SizedBox(height: 20),
-                    Text(displayName,
-                        style: TextStyle(
-                            color: textMain,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold)),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(displayName,
+                          style: TextStyle(
+                              color: textMain,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold)),
+                    ),
                     const SizedBox(height: 5),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            'User ID: $profileIdentifier',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                                color: textMain.withOpacity(0.7), fontSize: 14),
-                          ),
-                        ),
-                        if (hasProfileUserId) ...[
-                          const SizedBox(width: 6),
-                          IconButton(
-                            onPressed: _copyProfileUserId,
-                            icon: Icon(
-                              Icons.copy_rounded,
-                              size: 18,
-                              color: textMain.withOpacity(0.75),
-                            ),
-                            tooltip: 'Copy User ID',
-                            visualDensity: VisualDensity.compact,
-                            constraints: const BoxConstraints(
-                              minWidth: 32,
-                              minHeight: 32,
-                            ),
-                          ),
-                        ],
-                      ],
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(_userEmail,
+                          style: TextStyle(
+                              color: textMain.withOpacity(0.7), fontSize: 14)),
                     ),
                     const SizedBox(height: 30),
-                    Container(height: 1, color: Colors.white.withOpacity(0.2)),
+                    Container(height: 1, color: textMain.withOpacity(0.2)),
                     const SizedBox(height: 30),
                     _buildProfileOption(
                         Icons.settings_rounded, "Cài đặt hệ thống", textMain,
@@ -1121,7 +1111,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                           Text(
                               "Tính năng cài đặt thông số đang được nâng cấp. Pháp sư vui lòng chờ bản cập nhật tiếp theo nhé!",
                               style: TextStyle(
-                                  color: Colors.white.withOpacity(0.8),
+                                  color: textMain.withOpacity(0.8),
                                   height: 1.5),
                               textAlign: TextAlign.center));
                     }),
@@ -1137,7 +1127,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                             Text(
                                 "Chưa có cảnh báo nào! Sau này trợ lý AI sẽ theo dõi nhiệt/ẩm và gửi báo cáo khẩn cấp vào đây.",
                                 style: TextStyle(
-                                    color: Colors.white.withOpacity(0.8),
+                                    color: textMain.withOpacity(0.8),
                                     height: 1.5),
                                 textAlign: TextAlign.center)
                           ]));
@@ -1149,16 +1139,16 @@ class _DashboardScreenState extends State<DashboardScreen>
                       _showGlassDialog(
                           "Liên hệ Kỹ Thuật Viên",
                           Column(children: [
-                            _buildContactRow(Icons.person_outline, "Phúc (Dev)",
-                                Colors.white),
+                            _buildContactRow(
+                                Icons.person_outline, "Phúc (Dev)", textMain),
                             _buildContactRow(Icons.phone_iphone_rounded,
-                                "0123 456 789", Colors.white),
+                                "0123 456 789", textMain),
                             _buildContactRow(Icons.email_outlined,
-                                "phuc@hermit-home.com", Colors.white),
+                                "phuc@hermit-home.com", textMain),
                             _buildContactRow(Icons.code_rounded,
-                                "github.com/phuc-hermit", Colors.white),
+                                "github.com/phuc-hermit", textMain),
                             _buildContactRow(Icons.work_outline_rounded,
-                                "linkedin.com/in/phuc", Colors.white),
+                                "linkedin.com/in/phuc", textMain),
                           ]));
                     }),
                   ],
@@ -1167,23 +1157,27 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
           ),
           const SizedBox(height: 30),
-          SizedBox(
-            width: double.infinity,
-            height: 55,
-            child: ElevatedButton.icon(
-              onPressed: _handleLogout,
-              icon: const Icon(Icons.exit_to_app_rounded, color: Colors.white),
-              label: const Text("RỜI HANG",
-                  style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 2)),
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFF5252),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20)),
-                  elevation: 0),
+          ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 55),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _handleLogout,
+                icon:
+                    const Icon(Icons.exit_to_app_rounded, color: Colors.white),
+                label: const Text("RỜI HANG",
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 2)),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF5252),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20)),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 12)),
+              ),
             ),
           )
         ],
@@ -1201,8 +1195,11 @@ class _DashboardScreenState extends State<DashboardScreen>
           Icon(icon, color: textMain.withOpacity(0.8), size: 24),
           const SizedBox(width: 15),
           Expanded(
-              child:
-                  Text(title, style: TextStyle(color: textMain, fontSize: 16))),
+              child: FittedBox(
+            alignment: Alignment.centerLeft,
+            fit: BoxFit.scaleDown,
+            child: Text(title, style: TextStyle(color: textMain, fontSize: 16)),
+          )),
           Icon(Icons.chevron_right_rounded, color: textMain.withOpacity(0.5)),
         ],
       ),
@@ -1215,9 +1212,17 @@ class _DashboardScreenState extends State<DashboardScreen>
       child: Row(children: [
         Icon(icon, color: textMain.withOpacity(0.6), size: 20),
         const SizedBox(width: 15),
-        Text(text,
-            style: TextStyle(
-                color: textMain, fontSize: 15, fontWeight: FontWeight.w500))
+        Expanded(
+          child: FittedBox(
+            alignment: Alignment.centerLeft,
+            fit: BoxFit.scaleDown,
+            child: Text(text,
+                style: TextStyle(
+                    color: textMain,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500)),
+          ),
+        )
       ]),
     );
   }
@@ -1225,36 +1230,47 @@ class _DashboardScreenState extends State<DashboardScreen>
   // --- UI Helpers ---
   Widget _buildTelemetryItem(IconData icon, String label, String value,
       String unit, Color accentColor, Color textMain) {
-    return Row(
-      children: [
-        Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-                color: accentColor.withOpacity(0.2), shape: BoxShape.circle),
-            child: Icon(icon, color: accentColor, size: 28)),
-        const SizedBox(width: 15),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label,
-                style:
-                    TextStyle(color: textMain.withOpacity(0.7), fontSize: 13)),
-            Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(value,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 5),
+      child: Row(
+        children: [
+          Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                  color: accentColor.withOpacity(0.2), shape: BoxShape.circle),
+              child: Icon(icon, color: accentColor, size: 28)),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(label,
                       style: TextStyle(
-                          color: textMain,
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold)),
-                  Text(unit,
-                      style: TextStyle(
-                          color: textMain.withOpacity(0.7), fontSize: 16))
-                ])
-          ],
-        )
-      ],
+                          color: textMain.withOpacity(0.7), fontSize: 13)),
+                ),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(value,
+                            style: TextStyle(
+                                color: textMain,
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold)),
+                        Text(unit,
+                            style: TextStyle(
+                                color: textMain.withOpacity(0.7), fontSize: 16))
+                      ]),
+                )
+              ],
+            ),
+          )
+        ],
+      ),
     );
   }
 
@@ -1289,25 +1305,38 @@ class _DashboardScreenState extends State<DashboardScreen>
                   Icon(icon,
                       color: isOn ? activeColor : textMain.withOpacity(0.5),
                       size: 32),
-                  Switch(
-                      value: isOn,
-                      onChanged: onChanged,
-                      activeColor: activeColor,
-                      activeTrackColor: activeColor.withOpacity(0.3),
-                      inactiveThumbColor: Colors.white70,
-                      inactiveTrackColor: Colors.white.withOpacity(0.1)),
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Switch(
+                          value: isOn,
+                          onChanged: onChanged,
+                          activeColor: activeColor,
+                          activeTrackColor: activeColor.withOpacity(0.3),
+                          inactiveThumbColor: Colors.white70,
+                          inactiveTrackColor: textMain.withOpacity(0.1)),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 15),
-              Text(title,
-                  style: TextStyle(
-                      color: textMain,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600)),
-              Text(isOn ? "Đang chạy" : "Tạm nghỉ",
-                  style: TextStyle(
-                      color: isOn ? activeColor : textMain.withOpacity(0.5),
-                      fontSize: 12)),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(title,
+                    style: TextStyle(
+                        color: textMain,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600)),
+              ),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(isOn ? "Đang chạy" : "Tạm nghỉ",
+                    style: TextStyle(
+                        color: isOn ? activeColor : textMain.withOpacity(0.5),
+                        fontSize: 12)),
+              ),
             ],
           ),
         ),
@@ -1316,27 +1345,34 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Widget _buildGlassBottomNav(
-      Color glassBg, Color glassBorder, Color accentColor) {
+      Color glassBg, Color glassBorder, Color accentColor, Color textMain) {
     return Padding(
       padding: const EdgeInsets.only(left: 20, right: 20, bottom: 25),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(35),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Container(
-            height: 70,
-            decoration: BoxDecoration(
-                color: glassBg,
-                borderRadius: BorderRadius.circular(35),
-                border: Border.all(color: glassBorder, width: 1.5)),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildNavItem(
-                    0, Icons.show_chart_rounded, "Lịch sử", accentColor),
-                _buildNavItem(1, Icons.home_rounded, "Hang chính", accentColor),
-                _buildNavItem(2, Icons.person_rounded, "Hồ sơ", accentColor),
-              ],
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 70),
+            child: Container(
+              decoration: BoxDecoration(
+                  color: glassBg,
+                  borderRadius: BorderRadius.circular(35),
+                  border: Border.all(color: glassBorder, width: 1.5)),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  Expanded(
+                      child: _buildNavItem(0, Icons.show_chart_rounded,
+                          "Lịch sử", accentColor, textMain)),
+                  Expanded(
+                      child: _buildNavItem(1, Icons.home_rounded, "Hang chính",
+                          accentColor, textMain)),
+                  Expanded(
+                      child: _buildNavItem(2, Icons.person_rounded, "Hồ sơ",
+                          accentColor, textMain)),
+                ],
+              ),
             ),
           ),
         ),
@@ -1344,28 +1380,34 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  Widget _buildNavItem(
-      int index, IconData icon, String label, Color accentColor) {
+  Widget _buildNavItem(int index, IconData icon, String label,
+      Color accentColor, Color textMain) {
     bool isActive = _currentIndex == index;
     return GestureDetector(
       onTap: () => _onTabTapped(index),
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
             color: isActive ? accentColor.withOpacity(0.2) : Colors.transparent,
             borderRadius: BorderRadius.circular(20)),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon,
-                color: isActive ? accentColor : Colors.white.withOpacity(0.5),
+                color: isActive ? accentColor : textMain.withOpacity(0.5),
                 size: 26),
             if (isActive) ...[
               const SizedBox(width: 8),
-              Text(label,
-                  style: TextStyle(
-                      color: accentColor, fontWeight: FontWeight.bold))
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(label,
+                      style: TextStyle(
+                          color: accentColor, fontWeight: FontWeight.bold)),
+                ),
+              )
             ]
           ],
         ),
@@ -1373,7 +1415,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  Widget _buildDraggableThemeToggle(Color accentColor) {
+  Widget _buildDraggableThemeToggle(Color accentColor, Color textMain) {
     double leftPosition = 0;
     if (_currentThemeMode == AppThemeMode.auto) leftPosition = 35;
     if (_currentThemeMode == AppThemeMode.night) leftPosition = 70;
@@ -1381,32 +1423,33 @@ class _DashboardScreenState extends State<DashboardScreen>
     return GestureDetector(
       onHorizontalDragUpdate: (details) {
         double dx = details.localPosition.dx;
-        if (dx >= 0 && dx < 35)
+        if (dx >= 0 && dx < 35) {
           _setThemeMode(AppThemeMode.day);
-        else if (dx >= 35 && dx < 70)
+        } else if (dx >= 35 && dx < 70) {
           _setThemeMode(AppThemeMode.auto);
-        else if (dx >= 70 && dx <= 110) _setThemeMode(AppThemeMode.night);
+        } else if (dx >= 70 && dx <= 110) {
+          _setThemeMode(AppThemeMode.night);
+        }
       },
       onTapUp: (details) {
         double dx = details.localPosition.dx;
-        if (dx < 35)
+        if (dx < 35) {
           _setThemeMode(AppThemeMode.day);
-        else if (dx < 70)
+        } else if (dx < 70) {
           _setThemeMode(AppThemeMode.auto);
-        else
+        } else {
           _setThemeMode(AppThemeMode.night);
+        }
       },
       child: Container(
-        width:
-            108, // FIX: Tăng từ 105 lên 108 để bù trừ cho độ dày của viền (border)
-        height: 36, // Tăng nhẹ để không bị chèn ép trên/dưới
+        width: 108,
+        height: 36,
         decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.15),
+            color: textMain.withOpacity(0.15),
             borderRadius: BorderRadius.circular(20),
-            border:
-                Border.all(color: Colors.white.withOpacity(0.2), width: 1.5)),
+            border: Border.all(color: textMain.withOpacity(0.2), width: 1.5)),
         child: Stack(
-          alignment: Alignment.centerLeft, // Đảm bảo mọi thứ nằm giữa
+          alignment: Alignment.centerLeft,
           children: [
             AnimatedPositioned(
               duration: const Duration(milliseconds: 250),
@@ -1421,10 +1464,12 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
             Row(
               children: [
-                _buildToggleIcon(AppThemeMode.day, Icons.wb_sunny_rounded),
                 _buildToggleIcon(
-                    AppThemeMode.auto, Icons.access_time_filled_rounded),
-                _buildToggleIcon(AppThemeMode.night, Icons.nightlight_round),
+                    AppThemeMode.day, Icons.wb_sunny_rounded, textMain),
+                _buildToggleIcon(AppThemeMode.auto,
+                    Icons.access_time_filled_rounded, textMain),
+                _buildToggleIcon(
+                    AppThemeMode.night, Icons.nightlight_round, textMain),
               ],
             ),
           ],
@@ -1433,14 +1478,14 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  Widget _buildToggleIcon(AppThemeMode mode, IconData icon) {
+  Widget _buildToggleIcon(AppThemeMode mode, IconData icon, Color textMain) {
     return SizedBox(
         width: 35,
         height: 33,
         child: Icon(icon,
             color: _currentThemeMode == mode
                 ? Colors.white
-                : Colors.white.withOpacity(0.6),
+                : textMain.withOpacity(0.6),
             size: 16));
   }
 
@@ -1466,12 +1511,14 @@ class LineChartPainter extends CustomPainter {
   final List<String> timeLabels;
   final String unit;
   final Color lineColor;
+  final Color textColor;
 
   LineChartPainter(
       {required this.data,
       required this.timeLabels,
       required this.unit,
-      required this.lineColor});
+      required this.lineColor,
+      required this.textColor});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1489,9 +1536,8 @@ class LineChartPainter extends CustomPainter {
     final chartWidth = size.width - marginLeft;
     final chartHeight = size.height - marginBottom;
     final textStyle =
-        TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 10);
+        TextStyle(color: textColor.withOpacity(0.6), fontSize: 10);
 
-    // 1. VẼ TRỤC Y VÀ LƯỚI
     final ySteps = [minData, minData + range / 2, maxData];
     for (var val in ySteps) {
       final normalizedY = 1 - ((val - minData) / range);
@@ -1505,11 +1551,10 @@ class LineChartPainter extends CustomPainter {
           Offset(marginLeft, y),
           Offset(size.width, y),
           Paint()
-            ..color = Colors.white.withOpacity(0.1)
+            ..color = textColor.withOpacity(0.1)
             ..strokeWidth = 1);
     }
 
-    // 2. VẼ BIỂU ĐỒ (ÉP ĐỦ 6 CỘT CHỨA NULL)
     final paint = Paint()
       ..color = lineColor
       ..strokeWidth = 3
@@ -1555,15 +1600,14 @@ class LineChartPainter extends CustomPainter {
         final textSpan = TextSpan(children: [
           TextSpan(
               text: '${data[i]!.toStringAsFixed(1)}$unit\n',
-              style: const TextStyle(
-                  color: Colors.white,
+              style: TextStyle(
+                  color: textColor,
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
                   height: 1.2)),
           TextSpan(
               text: timeLabels[i],
-              style:
-                  TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 9)),
+              style: TextStyle(color: textColor.withOpacity(0.7), fontSize: 9)),
         ]);
         final tpPoint = TextPainter(
             text: textSpan,
@@ -1577,7 +1621,6 @@ class LineChartPainter extends CustomPainter {
         prevY = y;
       }
 
-      // Luôn vẽ thời gian trục X cho đủ 6 cột (Kể cả khoảng trống null)
       String timeLabel = i < timeLabels.length ? timeLabels[i] : "--:--";
       final tpTime = TextPainter(
           text: TextSpan(text: timeLabel, style: textStyle),
@@ -1589,7 +1632,6 @@ class LineChartPainter extends CustomPainter {
 
     canvas.drawPath(path, paint);
 
-    // 3. ĐỔ BÓNG DƯỚI ĐƯỜNG BIỂU ĐỒ (Chỉ nếu có nét vẽ)
     if (!isFirstValid && prevX != null) {
       final firstValidIndex = data.indexWhere((d) => d != null);
       final firstValidX = marginLeft + (firstValidIndex * stepX);

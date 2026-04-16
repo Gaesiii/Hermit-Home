@@ -26,6 +26,17 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/warrior_logo.jpg
+    - assets/images/download.png
+    - assets/images/download1.png
+    - assets/images/logo.png
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/logo.png"

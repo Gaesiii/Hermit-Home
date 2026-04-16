@@ -8,8 +8,7 @@ import '../../../../core/services/auth_service.dart';
 enum AppThemeMode { day, auto, night }
 
 class LoginScreen extends StatefulWidget {
-  final String? resetToken; // Token từ Deep Link (nếu có)
-
+  final String? resetToken;
   final String? resetStatus;
   final String? resetUserId;
   final DateTime? resetExpiresAt;
@@ -84,7 +83,6 @@ class _LoginScreenState extends State<LoginScreen>
   void initState() {
     super.initState();
 
-    // Nếu có token từ Deep Link, mở thẳng trang 0 (Đổi mật khẩu)
     final incomingStatus = _normalizeResetStatus(
       widget.resetStatus,
       fallbackToken: widget.resetToken,
@@ -231,21 +229,21 @@ class _LoginScreenState extends State<LoginScreen>
   String _messageForResetStatus(String status) {
     switch (status) {
       case 'valid':
-        return 'Reset link is valid. Enter your new password.';
+        return 'Tín hiệu tìm vỏ hợp lệ. Hãy rèn mật mã mới!';
       case 'missing_token':
-        return 'Reset link is missing token.';
+        return 'Tín hiệu tìm vỏ bị rớt mất token rồi.';
       case 'invalid_token':
-        return 'Reset link is invalid.';
+        return 'Tín hiệu tìm vỏ này hỏng rồi.';
       case 'expired_token':
-        return 'Reset link has expired.';
+        return 'Tín hiệu tìm vỏ đã bay màu theo sóng biển (hết hạn).';
       case 'used_token':
-        return 'Reset link has already been used.';
+        return 'Tín hiệu này đã được dùng để đúc vỏ trước đó rồi.';
       case 'user_not_found':
-        return 'No account found for this reset link.';
+        return 'Không tìm thấy ốc mượn hồn nào ở tọa độ này.';
       case 'server_error':
-        return 'Server cannot verify reset link right now.';
+        return 'Bão biển làm mất kết nối máy chủ, thử lại sau nhé.';
       default:
-        return 'Reset link status is not supported.';
+        return 'Tình trạng tín hiệu không xác định được.';
     }
   }
 
@@ -306,7 +304,6 @@ class _LoginScreenState extends State<LoginScreen>
       }
     });
   }
-  // =========================================================
 
   void _onPageChanged(int index) {
     FocusScope.of(context).unfocus();
@@ -349,7 +346,7 @@ class _LoginScreenState extends State<LoginScreen>
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/dashboard');
     } else {
-      _showError('Mật mã vỏ không đúng rồi!');
+      _showError('Mật mã khép vỏ trật lất rồi!');
     }
   }
 
@@ -357,7 +354,7 @@ class _LoginScreenState extends State<LoginScreen>
     if (_isLoading || !(_registerFormKey.currentState?.validate() ?? false))
       return;
     if (_regPassCtrl.text != _regConfirmCtrl.text) {
-      _showError('Mật mã nhắc lại chưa khớp!');
+      _showError('Mật mã nhắc lại lệch tông rồi!');
       return;
     }
     setState(() => _isLoading = true);
@@ -371,7 +368,7 @@ class _LoginScreenState extends State<LoginScreen>
     if (result.isSuccess) {
       Navigator.pushReplacementNamed(context, '/dashboard');
     } else {
-      _showError(result.errorMessage ?? 'Dựng vỏ thất bại!');
+      _showError(result.errorMessage ?? 'Săn vỏ thất bại, sóng đánh tan tành!');
     }
   }
 
@@ -381,7 +378,7 @@ class _LoginScreenState extends State<LoginScreen>
 
     final email = _forgotEmailCtrl.text.trim();
     if (!_isValidEmail(email)) {
-      _showError('Email is not valid.');
+      _showError('Tọa độ bãi cát (Email) sai cú pháp rồi.');
       return;
     }
 
@@ -400,7 +397,7 @@ class _LoginScreenState extends State<LoginScreen>
     if (result.isSuccess) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Reset link was sent to your email.'),
+          content: Text('Tín hiệu tìm vỏ đã được thả trôi chai vào mail bạn.'),
           backgroundColor: Colors.green,
         ),
       );
@@ -408,7 +405,7 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
-    _showError(result.errorMessage ?? 'Failed to send reset email.');
+    _showError(result.errorMessage ?? 'Gửi tín hiệu xịt rồi, sóng yếu quá.');
   }
 
   Future<void> _submitResetPassword() async {
@@ -416,17 +413,17 @@ class _LoginScreenState extends State<LoginScreen>
       return;
 
     if (_currentResetToken == null) {
-      _showError('Reset link is invalid or expired.');
+      _showError('Tín hiệu tìm vỏ hỏng hoặc đã chìm mất.');
       return;
     }
 
     if (_newPassCtrl.text.length < 8) {
-      _showError('Password must be at least 8 characters.');
+      _showError('Mật mã khép vỏ phải dày ít nhất 8 lớp (ký tự).');
       return;
     }
 
     if (_newPassCtrl.text != _newPassConfirmCtrl.text) {
-      _showError('Passwords do not match.');
+      _showError('Hai lớp mật mã vỏ gõ chưa khớp nhau.');
       return;
     }
 
@@ -443,7 +440,7 @@ class _LoginScreenState extends State<LoginScreen>
     if (result.isSuccess) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Password reset successfully.'),
+          content: Text('Đúc lại mật mã thành công! Về hang thôi.'),
           backgroundColor: Colors.green,
         ),
       );
@@ -461,7 +458,7 @@ class _LoginScreenState extends State<LoginScreen>
     }
 
     final errorMessage =
-        result.errorMessage ?? 'Reset link is invalid or expired.';
+        result.errorMessage ?? 'Tín hiệu tìm vỏ hỏng hoặc đã chìm mất.';
     if (errorMessage.toLowerCase().contains('invalid') ||
         errorMessage.toLowerCase().contains('expired') ||
         errorMessage.toLowerCase().contains('used')) {
@@ -484,47 +481,61 @@ class _LoginScreenState extends State<LoginScreen>
 
   String _getHeaderText() {
     if (_currentPage == 0) {
-      return _currentResetToken == null ? 'Forgot Password' : 'Reset Password';
+      return _currentResetToken == null
+          ? 'Lạc Mất Đường Vào Hang?'
+          : 'Đúc Lại Chìa Khóa Vỏ';
     } else if (_currentPage == 1) {
-      return 'Welcome Back!';
+      return 'Chào Mừng Về Vỏ!';
     }
-    return 'Create Account';
+    return 'Tìm Vỏ Mới';
   }
 
   @override
   Widget build(BuildContext context) {
+    // Logic responsive cho kích thước màn hình
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isSmallScreen = screenHeight < 650;
+    final double logoSize = isSmallScreen ? 70 : 100;
+    final double spacing = isSmallScreen ? 10 : 20;
+
     return AnimatedBuilder(
       animation: _themeController,
       builder: (context, child) {
         double t = _themeController.value;
 
+        // BẢNG MÀU ĐÃ CẬP NHẬT TƯƠNG PHẢN ĐỘNG
         Color bgCenter =
-            Color.lerp(const Color(0xFF56CCF2), const Color(0xFF002D5E), t)!;
+            Color.lerp(const Color(0xFFE1F5FE), const Color(0xFF002D5E), t)!;
         Color bgEdge =
-            Color.lerp(const Color(0xFF2F80ED), const Color(0xFF000B18), t)!;
+            Color.lerp(const Color(0xFF4FC3F7), const Color(0xFF000B18), t)!;
 
-        Color wave1 = Color.lerp(Colors.white.withOpacity(0.5),
+        Color wave1 = Color.lerp(Colors.white.withOpacity(0.6),
             const Color(0xFF006DFF).withOpacity(0.2), t)!;
-        Color wave2 = Color.lerp(Colors.white.withOpacity(0.3),
+        Color wave2 = Color.lerp(Colors.white.withOpacity(0.4),
             const Color(0xFF00D2FF).withOpacity(0.15), t)!;
-        Color wave3 = Color.lerp(Colors.white.withOpacity(0.1),
+        Color wave3 = Color.lerp(Colors.white.withOpacity(0.2),
             const Color(0xFF00F2FF).withOpacity(0.1), t)!;
 
-        Color particleColor = Color.lerp(Colors.white.withOpacity(0.7),
-            Colors.cyanAccent.withOpacity(0.25), t)!;
+        Color particleColor = Color.lerp(
+            const Color(0xFF0288D1).withOpacity(0.4),
+            Colors.cyanAccent.withOpacity(0.25),
+            t)!;
         Color accentColor =
-            Color.lerp(const Color(0xFFFF8C00), const Color(0xFF00D2FF), t)!;
+            Color.lerp(const Color(0xFFE65100), const Color(0xFF00D2FF), t)!;
 
-        Color textMain = Colors.white;
+        Color textMain = Color.lerp(const Color(0xFF001E36), Colors.white, t)!;
+
         Color glassBg = Color.lerp(
-            Colors.white.withOpacity(0.2), Colors.white.withOpacity(0.05), t)!;
+            Colors.white.withOpacity(0.55), Colors.white.withOpacity(0.08), t)!;
         Color glassBorder = Color.lerp(
-            Colors.white.withOpacity(0.5), Colors.white.withOpacity(0.1), t)!;
+            Colors.white.withOpacity(0.9), Colors.white.withOpacity(0.15), t)!;
 
-        Color inputFill = Colors.white.withOpacity(0.1);
-        Color inputHint = Colors.white.withOpacity(0.7);
+        Color inputFill = Color.lerp(
+            Colors.white.withOpacity(0.65), Colors.white.withOpacity(0.1), t)!;
+        Color inputHint = Color.lerp(const Color(0xFF003366).withOpacity(0.6),
+            Colors.white.withOpacity(0.5), t)!;
         Color inputFocusedBorder =
-            Color.lerp(Colors.white, const Color(0xFF00D2FF), t)!;
+            Color.lerp(accentColor, const Color(0xFF00D2FF), t)!;
 
         return Scaffold(
           backgroundColor: bgEdge,
@@ -580,51 +591,83 @@ class _LoginScreenState extends State<LoginScreen>
                   children: [
                     Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 40, vertical: 15),
+                          horizontal: 20, vertical: 10),
                       child: Align(
                         alignment: Alignment.topRight,
-                        child: _buildDraggableThemeToggle(accentColor),
+                        child:
+                            _buildDraggableThemeToggle(accentColor, textMain),
                       ),
                     ),
-                    RotationTransition(
-                      turns: _slowLogoController,
-                      child: AlchemistVortexLogo(size: 100, color: accentColor),
-                    ),
-                    const SizedBox(height: 15),
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 400),
-                      child: Text(
-                        _getHeaderText(),
-                        key: ValueKey<String>(_getHeaderText()),
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w900,
-                          color: textMain,
-                          letterSpacing: 1.5,
-                          shadows: [
-                            Shadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 5)
-                          ],
+                    //
+                    Container(
+                      width: logoSize,
+                      height: logoSize,
+                      decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: accentColor, width: 3),
+                          boxShadow: [
+                            BoxShadow(
+                              color: accentColor
+                                  .withOpacity(0.4), // Phát sáng viền ngoài
+                              blurRadius: 20,
+                              spreadRadius: 2,
+                            )
+                          ]),
+                      child: ClipOval(
+                        child: Image.asset(
+                          _isCurrentlyDark
+                              ? 'assets/images/download.png'
+                              : 'assets/images/download1.png',
+                          fit: BoxFit.cover,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Hệ thống quản lý cư dân Hermit-Home',
-                      style: TextStyle(
-                          color: textMain.withOpacity(0.8),
-                          fontSize: 14,
-                          letterSpacing: 1.1),
+                    SizedBox(height: spacing),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 400),
+                          child: Text(
+                            _getHeaderText(),
+                            key: ValueKey<String>(_getHeaderText()),
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w900,
+                              color: textMain,
+                              letterSpacing: 1.5,
+                              shadows: [
+                                Shadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 5)
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 4),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'Hệ thống quản lý cư dân Hermit-Home',
+                          style: TextStyle(
+                              color: textMain.withOpacity(0.8),
+                              fontSize: 14,
+                              letterSpacing: 1.1),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: spacing),
                     Expanded(
                       child: PageView(
                         controller: _pageController,
                         physics: const BouncingScrollPhysics(),
                         onPageChanged: _onPageChanged,
                         children: [
-                          // Trang 0: Quên mật khẩu / Đổi mật khẩu
                           _buildForgotOrResetForm(
                             glassBg: glassBg,
                             glassBorder: glassBorder,
@@ -634,7 +677,6 @@ class _LoginScreenState extends State<LoginScreen>
                             inputHint: inputHint,
                             focusedBorderColor: inputFocusedBorder,
                           ),
-                          // Trang 1: Đăng nhập
                           _buildLoginForm(
                             glassBg: glassBg,
                             glassBorder: glassBorder,
@@ -644,7 +686,6 @@ class _LoginScreenState extends State<LoginScreen>
                             inputHint: inputHint,
                             focusedBorderColor: inputFocusedBorder,
                           ),
-                          // Trang 2: Đăng ký
                           _buildRegisterForm(
                             glassBg: glassBg,
                             glassBorder: glassBorder,
@@ -681,7 +722,7 @@ class _LoginScreenState extends State<LoginScreen>
     final isResetMode = _currentResetToken != null;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
+      padding: const EdgeInsets.symmetric(horizontal: 30),
       child: Column(
         children: [
           _buildGlassContainer(
@@ -693,7 +734,7 @@ class _LoginScreenState extends State<LoginScreen>
                 children: [
                   if (!isResetMode) ...[
                     Text(
-                      'Enter your account email to receive a reset link.',
+                      'Nhập tọa độ hang để nhận thư dạt bờ tìm lại vỏ nhé!',
                       style: TextStyle(color: textMain, fontSize: 14),
                       textAlign: TextAlign.center,
                     ),
@@ -712,7 +753,7 @@ class _LoginScreenState extends State<LoginScreen>
                     const SizedBox(height: 16),
                     _buildField(
                       controller: _forgotEmailCtrl,
-                      label: 'Email',
+                      label: 'Tọa độ vỏ (Email)',
                       icon: Icons.waves_rounded,
                       accentColor: accentColor,
                       textMain: textMain,
@@ -722,38 +763,14 @@ class _LoginScreenState extends State<LoginScreen>
                     ),
                   ] else ...[
                     Text(
-                      'Reset link is valid. Enter your new password.',
+                      'Đã tìm thấy hang! Hãy rèn một đoạn mật mã vỏ mới cứng cáp hơn.',
                       style: TextStyle(color: textMain, fontSize: 14),
                       textAlign: TextAlign.center,
                     ),
                     if (_resetDeepLinkStatus != null) ...[
                       const SizedBox(height: 10),
                       Text(
-                        'Status: $_resetDeepLinkStatus',
-                        style: TextStyle(
-                          color: textMain.withOpacity(0.9),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                    if (_resetDeepLinkUserId != null) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        'User ID: $_resetDeepLinkUserId',
-                        style: TextStyle(
-                          color: textMain.withOpacity(0.9),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                    if (_resetDeepLinkExpiresAt != null) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        'Expires at: ${_formatResetExpiresAt(_resetDeepLinkExpiresAt!)}',
+                        'Trạng thái sóng: $_resetDeepLinkStatus',
                         style: TextStyle(
                           color: textMain.withOpacity(0.9),
                           fontSize: 13,
@@ -765,7 +782,7 @@ class _LoginScreenState extends State<LoginScreen>
                     const SizedBox(height: 16),
                     _buildField(
                       controller: _newPassCtrl,
-                      label: 'New password',
+                      label: 'Mật mã vỏ mới',
                       icon: Icons.lock_reset,
                       obscureText: true,
                       accentColor: accentColor,
@@ -777,7 +794,7 @@ class _LoginScreenState extends State<LoginScreen>
                     const SizedBox(height: 16),
                     _buildField(
                       controller: _newPassConfirmCtrl,
-                      label: 'Confirm new password',
+                      label: 'Khắc lại mật mã vỏ mới',
                       icon: Icons.verified_user_outlined,
                       obscureText: true,
                       accentColor: accentColor,
@@ -787,9 +804,9 @@ class _LoginScreenState extends State<LoginScreen>
                       focusedBorderColor: focusedBorderColor,
                     ),
                   ],
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
                   _buildSubmitBtn(
-                    label: isResetMode ? 'RESET PASSWORD' : 'SEND RESET EMAIL',
+                    label: isResetMode ? 'ĐÚC LẠI VỎ' : 'GỬI TÍN HIỆU TÌM VỎ',
                     onPressed: isResetMode
                         ? _submitResetPassword
                         : _submitForgotPassword,
@@ -799,14 +816,15 @@ class _LoginScreenState extends State<LoginScreen>
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 15),
           _buildNavText(
-            text1: 'Remember your password? ',
-            text2: 'Back to login',
+            text1: 'Nhớ ra đường chui vào vỏ rồi? ',
+            text2: 'Về hang thôi',
             onTap: () => _goToPage(1),
             textMain: textMain,
             accentColor: accentColor,
           ),
+          const SizedBox(height: 20),
         ],
       ),
     );
@@ -822,7 +840,7 @@ class _LoginScreenState extends State<LoginScreen>
     required Color focusedBorderColor,
   }) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
+      padding: const EdgeInsets.symmetric(horizontal: 30),
       child: Column(
         children: [
           _buildGlassContainer(
@@ -834,7 +852,7 @@ class _LoginScreenState extends State<LoginScreen>
                 children: [
                   _buildField(
                     controller: _loginEmailCtrl,
-                    label: 'Địa chỉ hang (Email)',
+                    label: 'Tọa độ bãi cát (Email)',
                     icon: Icons.waves_rounded,
                     accentColor: accentColor,
                     textMain: textMain,
@@ -845,7 +863,7 @@ class _LoginScreenState extends State<LoginScreen>
                   const SizedBox(height: 16),
                   _buildField(
                     controller: _loginPassCtrl,
-                    label: 'Mật mã bảo vệ',
+                    label: 'Mật khẩu khép vỏ',
                     icon: Icons.security_rounded,
                     obscureText: true,
                     accentColor: accentColor,
@@ -855,75 +873,80 @@ class _LoginScreenState extends State<LoginScreen>
                     focusedBorderColor: focusedBorderColor,
                   ),
                   const SizedBox(height: 8),
-
-                  // Row chứa Nhớ mật khẩu & Quên mật khẩu
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      GestureDetector(
-                        onTap: () => setState(() => _rememberMe = !_rememberMe),
-                        behavior: HitTestBehavior.opaque,
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 20,
-                              height: 20,
-                              decoration: BoxDecoration(
-                                color: _rememberMe
-                                    ? accentColor.withOpacity(0.8)
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                    color: _rememberMe
-                                        ? accentColor
-                                        : Colors.white.withOpacity(0.5),
-                                    width: 1.5),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        GestureDetector(
+                          onTap: () =>
+                              setState(() => _rememberMe = !_rememberMe),
+                          behavior: HitTestBehavior.opaque,
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 20,
+                                height: 20,
+                                decoration: BoxDecoration(
+                                  color: _rememberMe
+                                      ? accentColor.withOpacity(0.8)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                      color: _rememberMe
+                                          ? accentColor
+                                          : textMain.withOpacity(
+                                              0.5), // Sửa tương phản nút tick
+                                      width: 1.5),
+                                ),
+                                child: _rememberMe
+                                    ? const Icon(Icons.check_rounded,
+                                        size: 14,
+                                        color: Colors
+                                            .white) // Icon tick luôn trắng
+                                    : null,
                               ),
-                              child: _rememberMe
-                                  ? const Icon(Icons.check_rounded,
-                                      size: 14, color: Colors.white)
-                                  : null,
-                            ),
-                            const SizedBox(width: 8),
-                            Text("Nhớ tôi",
-                                style: TextStyle(
-                                    color: textMain.withOpacity(0.8),
-                                    fontSize: 13)),
-                          ],
+                              const SizedBox(width: 8),
+                              Text("Đánh dấu mùi vỏ",
+                                  style: TextStyle(
+                                      color: textMain.withOpacity(0.8),
+                                      fontSize: 13)),
+                            ],
+                          ),
                         ),
-                      ),
-                      TextButton(
-                        onPressed: () =>
-                            _goToPage(0), // Vuốt trái / Bấm sang Forgot Pass
-                        style: TextButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            minimumSize: const Size(0, 0),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                        child: Text("Quên mật mã?",
-                            style: TextStyle(
-                                color: accentColor,
-                                fontSize: 13,
-                                decoration: TextDecoration.underline)),
-                      ),
-                    ],
+                        const SizedBox(width: 20),
+                        TextButton(
+                          onPressed: () => _goToPage(0),
+                          style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: const Size(0, 0),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                          child: Text("Sóng cuốn mất chìa?",
+                              style: TextStyle(
+                                  color: accentColor,
+                                  fontSize: 13,
+                                  decoration: TextDecoration.underline)),
+                        ),
+                      ],
+                    ),
                   ),
-
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
                   _buildSubmitBtn(
-                      label: 'CHUI VÀO VỎ',
+                      label: 'CỤP MẮT VÀ CHUI VÀO',
                       onPressed: _submitLogin,
                       accentColor: accentColor),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 15),
           _buildNavText(
-              text1: "Chưa có vỏ? ",
-              text2: "Đi tìm vỏ mới",
+              text1: "Đang ở trần? ",
+              text2: "Đi lùng vỏ mới",
               onTap: () => _goToPage(2),
               textMain: textMain,
               accentColor: accentColor),
+          const SizedBox(height: 20),
         ],
       ),
     );
@@ -939,7 +962,7 @@ class _LoginScreenState extends State<LoginScreen>
     required Color focusedBorderColor,
   }) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
+      padding: const EdgeInsets.symmetric(horizontal: 30),
       child: Column(
         children: [
           _buildGlassContainer(
@@ -951,7 +974,7 @@ class _LoginScreenState extends State<LoginScreen>
                 children: [
                   _buildField(
                     controller: _regEmailCtrl,
-                    label: 'Địa chỉ hang (Email)',
+                    label: 'Tọa độ bãi cát (Email)',
                     icon: Icons.waves_rounded,
                     accentColor: accentColor,
                     textMain: textMain,
@@ -962,7 +985,7 @@ class _LoginScreenState extends State<LoginScreen>
                   const SizedBox(height: 16),
                   _buildField(
                     controller: _regPassCtrl,
-                    label: 'Mật mã bảo vệ',
+                    label: 'Mã chống cua hoàng đế',
                     icon: Icons.security_rounded,
                     obscureText: true,
                     accentColor: accentColor,
@@ -974,7 +997,7 @@ class _LoginScreenState extends State<LoginScreen>
                   const SizedBox(height: 16),
                   _buildField(
                     controller: _regConfirmCtrl,
-                    label: 'Nhắc lại mật mã',
+                    label: 'Khắc lại mã chống cua',
                     icon: Icons.verified_user_outlined,
                     obscureText: true,
                     accentColor: accentColor,
@@ -983,22 +1006,23 @@ class _LoginScreenState extends State<LoginScreen>
                     inputHint: inputHint,
                     focusedBorderColor: focusedBorderColor,
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
                   _buildSubmitBtn(
-                      label: 'XÂY HANG NGAY',
+                      label: 'CHIẾM VỎ NGAY',
                       onPressed: _submitRegister,
                       accentColor: accentColor),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 15),
           _buildNavText(
-              text1: "Đã có vỏ rồi? ",
-              text2: "Về hang thôi!",
+              text1: "Có vỏ xịn rồi? ",
+              text2: "Về hang ngủ thôi!",
               onTap: () => _goToPage(1),
               textMain: textMain,
               accentColor: accentColor),
+          const SizedBox(height: 20),
         ],
       ),
     );
@@ -1030,30 +1054,35 @@ class _LoginScreenState extends State<LoginScreen>
       {required String label,
       required VoidCallback onPressed,
       required Color accentColor}) {
-    return SizedBox(
-      width: double.infinity,
-      height: 55,
-      child: ElevatedButton(
-        onPressed: _isLoading ? null : onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: accentColor,
-          foregroundColor: Colors.white,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          elevation: 0,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 55),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: _isLoading ? null : onPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: accentColor,
+            foregroundColor: Colors.white, // Chữ trên nút nhấn vẫn là màu trắng
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          ),
+          child: _isLoading
+              ? RotationTransition(
+                  turns: _fastLogoController,
+                  child:
+                      const AlchemistVortexLogo(size: 28, color: Colors.white),
+                )
+              : Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2),
+                ),
         ),
-        child: _isLoading
-            ? RotationTransition(
-                turns: _fastLogoController,
-                child: const AlchemistVortexLogo(size: 28, color: Colors.white),
-              )
-            : Text(
-                label,
-                style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 2),
-              ),
       ),
     );
   }
@@ -1067,6 +1096,7 @@ class _LoginScreenState extends State<LoginScreen>
     return TextButton(
       onPressed: onTap,
       child: RichText(
+        textAlign: TextAlign.center,
         text: TextSpan(
           text: text1,
           style: TextStyle(color: textMain.withOpacity(0.8), fontSize: 15),
@@ -1084,10 +1114,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // Giữ nguyên _buildDraggableThemeToggle, _buildToggleIcon, _buildWave, _buildField, WavePainter, ParticlePainter, AlchemistVortexLogo...
-  // Do giới hạn độ dài, các phần này tôi không lặp lại code cũ, Thầy ghép chung với các hàm và class đã có ở file hiện tại.
-
-  Widget _buildDraggableThemeToggle(Color accentColor) {
+  Widget _buildDraggableThemeToggle(Color accentColor, Color textMain) {
     double leftPosition = 0;
     if (_currentThemeMode == AppThemeMode.auto) leftPosition = 35;
     if (_currentThemeMode == AppThemeMode.night) leftPosition = 70;
@@ -1114,9 +1141,9 @@ class _LoginScreenState extends State<LoginScreen>
         width: 108,
         height: 36,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.15),
+          color: textMain.withOpacity(0.15),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.5),
+          border: Border.all(color: textMain.withOpacity(0.2), width: 1.5),
         ),
         child: Stack(
           alignment: Alignment.centerLeft,
@@ -1136,10 +1163,12 @@ class _LoginScreenState extends State<LoginScreen>
             ),
             Row(
               children: [
-                _buildToggleIcon(AppThemeMode.day, Icons.wb_sunny_rounded),
                 _buildToggleIcon(
-                    AppThemeMode.auto, Icons.access_time_filled_rounded),
-                _buildToggleIcon(AppThemeMode.night, Icons.nightlight_round),
+                    AppThemeMode.day, Icons.wb_sunny_rounded, textMain),
+                _buildToggleIcon(AppThemeMode.auto,
+                    Icons.access_time_filled_rounded, textMain),
+                _buildToggleIcon(
+                    AppThemeMode.night, Icons.nightlight_round, textMain),
               ],
             ),
           ],
@@ -1148,15 +1177,17 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  Widget _buildToggleIcon(AppThemeMode mode, IconData icon) {
+  Widget _buildToggleIcon(AppThemeMode mode, IconData icon, Color textMain) {
     return SizedBox(
       width: 35,
       height: 33,
       child: Icon(
         icon,
         color: _currentThemeMode == mode
-            ? Colors.white
-            : Colors.white.withOpacity(0.6),
+            ? Colors
+                .white // Icon đang chọn (nằm đè lên màu cam/xanh cyan) luôn hiển thị màu Trắng
+            : textMain.withOpacity(
+                0.6), // Các icon chưa được chọn tự tương phản với nền
         size: 16,
       ),
     );
@@ -1201,18 +1232,18 @@ class _LoginScreenState extends State<LoginScreen>
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(color: inputHint, fontSize: 14),
-        prefixIcon: Icon(icon, color: Colors.white, size: 20),
+        prefixIcon: Icon(icon,
+            color: textMain.withOpacity(0.8),
+            size: 20), // Chỉnh tương phản cho icon
         filled: true,
         fillColor: inputFill,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide:
-              BorderSide(color: Colors.white.withOpacity(0.3), width: 1.0),
+          borderSide: BorderSide(color: textMain.withOpacity(0.3), width: 1.0),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide:
-              BorderSide(color: Colors.white.withOpacity(0.3), width: 1.0),
+          borderSide: BorderSide(color: textMain.withOpacity(0.3), width: 1.0),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
