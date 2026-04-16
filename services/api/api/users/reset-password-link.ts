@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { findPasswordResetToken } from '../../lib/passwordResetModel';
 import { getUsersCollection } from '../../lib/userModel';
+import { toUtc7Iso } from '../../lib/timezone';
 
 const DEFAULT_APP_DEEPLINK = 'hermithome://reset-password';
 
@@ -92,7 +93,7 @@ export default async function handler(
     }
 
     const now = Date.now();
-    const expiresAtIso = resetToken.expiresAt?.toISOString();
+    const expiresAtIso = toUtc7Iso(resetToken.expiresAt) || undefined;
     const userId = resetToken.userId.toHexString();
 
     if (resetToken.usedAt) {

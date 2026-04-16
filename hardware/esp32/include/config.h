@@ -42,7 +42,7 @@
 // ----------------------------------------------------------------
 //  CẤU HÌNH MQTT — HiveMQ Cloud (TLS port 8883)
 // ----------------------------------------------------------------
-#define MQTT_BROKER     "pinkmason-9beefcd2.a02.usw2.aws.hivemq.cloud"
+#define MQTT_BROKER     "hermit-home-798c7baa.a01.euc1.aws.hivemq.cloud"
 #define MQTT_PORT       8883
 #define MQTT_USER       "admin"
 #define MQTT_PASS       "Admin1!@"

@@ -37,7 +37,8 @@ function sleep(ms) {
 }
 
 function nowIso() {
-  return new Date().toISOString();
+  const utc7 = new Date(Date.now() + 7 * 60 * 60 * 1000);
+  return utc7.toISOString().replace('Z', '+07:00');
 }
 
 function parseConfirmPayload(buffer) {

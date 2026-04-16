@@ -2,6 +2,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { connectToDatabase } from '../../../lib/mongoClient';
 import { verifyAuth } from '../../../lib/authMiddleware';
 import { handleApiPreflight, methodNotAllowed } from '../../../lib/http';
+import { toUtc7Iso } from '../../../lib/timezone';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const allowedMethods = ['GET'] as const;
@@ -72,7 +73,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(404).json({ error: 'No data found for this device' });
     }
 
-    return res.status(200).json(latest[0]);
+    const latestDocument = latest[0] as Record<string, unknown>;
+    const normalized = {
+      ...latestDocument,
+      timestamp: toUtc7Iso(latestDocument.timestamp as Date | string) ?? latestDocument.timestamp,
+    };
+
+    return res.status(200).json(normalized);
   } catch (error) {
     return res.status(500).json({ error: 'Database connection failed' });
   }
