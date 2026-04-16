@@ -154,6 +154,7 @@ export async function consumePasswordResetToken(
   return result;
 }
 
+
 export async function findActivePasswordResetToken(
   rawToken: string,
 ): Promise<PasswordResetTokenDocument | null> {
@@ -166,6 +167,7 @@ export async function findActivePasswordResetToken(
     usedAt: null,
     expiresAt: { $gt: now },
   });
+
 }
 
 export async function invalidateAllPasswordResetTokensForUser(userId: ObjectId): Promise<void> {

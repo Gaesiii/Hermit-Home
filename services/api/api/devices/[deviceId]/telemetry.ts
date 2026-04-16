@@ -3,6 +3,7 @@ import type { WithId } from 'mongodb';
 import { connectToDatabase } from '../../../lib/mongoClient';
 import { withAuth, AuthenticatedRequest } from '../../../lib/authMiddleware';
 import { handleApiPreflight, methodNotAllowed } from '../../../lib/http';
+import { toUtc7Iso } from '../../../lib/timezone';
 
 const OBJECT_ID_REGEX = /^[a-f\d]{24}$/i;
 const DEFAULT_LIMIT = 30;
@@ -71,14 +72,12 @@ function resolveAuthorizedDeviceId(
 }
 
 function normalizeTelemetry(doc: WithId<TelemetryDocument>) {
-  const timestamp = doc.timestamp instanceof Date
-    ? doc.timestamp.toISOString()
-    : new Date(doc.timestamp).toISOString();
+  const timestamp = toUtc7Iso(doc.timestamp);
 
   return {
     id: doc._id.toString(),
     userId: doc.userId,
-    timestamp,
+    timestamp: timestamp ?? null,
     temperature: doc.temperature,
     humidity: doc.humidity,
     lux: doc.lux,

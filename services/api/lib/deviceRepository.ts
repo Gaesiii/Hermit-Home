@@ -1,6 +1,7 @@
 import { Db } from 'mongodb';
 import { DeviceMode, DeviceStatePatch, DeviceStateRecord, RelayState } from '@smart-terrarium/shared-types';
 import { sanitizeRelayMap } from './mistSafety';
+import { toUtc7Iso } from './timezone';
 
 const COLLECTION_NAME = 'devices';
 
@@ -22,12 +23,7 @@ type DeviceDocument = {
 };
 
 function toIsoString(value: Date | string | null | undefined): string | null {
-  if (!value) {
-    return null;
-  }
-
-  const date = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  return toUtc7Iso(value);
 }
 
 function mapDeviceDocument(doc: DeviceDocument): DeviceStateRecord {
@@ -41,7 +37,7 @@ function mapDeviceDocument(doc: DeviceDocument): DeviceStateRecord {
     },
     lastTelemetryAt: toIsoString(doc.lastTelemetryAt),
     lastCommandAt: toIsoString(doc.lastCommandAt),
-    updatedAt: toIsoString(doc.updatedAt) ?? new Date(0).toISOString()
+    updatedAt: toIsoString(doc.updatedAt) ?? toUtc7Iso(new Date(0))!
   };
 }
 

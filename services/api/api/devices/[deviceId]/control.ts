@@ -11,6 +11,7 @@ import {
 import { publishCommand } from '../../../lib/mqttPublisher';
 import { MIST_SAFETY_LOCK_ENABLED, sanitizeRelayMap } from '../../../lib/mistSafety';
 import { handleApiPreflight, methodNotAllowed } from '../../../lib/http';
+import { toUtc7Iso } from '../../../lib/timezone';
 
 const OBJECT_ID_REGEX = /^[a-f\d]{24}$/i;
 
@@ -65,7 +66,12 @@ async function handleGet(
 
   try {
     const history = await getRecentDeviceStates(deviceId, req.user.userId, limit);
-    res.status(200).json({ deviceId, history });
+    const normalizedHistory = history.map((entry) => ({
+      ...entry,
+      _id: entry._id?.toString?.() ?? entry._id,
+      createdAt: toUtc7Iso(entry.createdAt) ?? entry.createdAt,
+    }));
+    res.status(200).json({ deviceId, history: normalizedHistory });
   } catch (error: unknown) {
     console.error('[GET /api/devices/[deviceId]/control]', error);
     res.status(500).json({ error: 'An unexpected error occurred. Please try again.' });

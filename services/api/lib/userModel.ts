@@ -1,6 +1,7 @@
 import { Collection, MongoServerError, ObjectId } from 'mongodb';
 import bcrypt from 'bcryptjs';
 import { connectToDatabase } from './mongoClient';
+import { toUtc7Iso } from './timezone';
 
 export interface UserDocument {
   _id?: ObjectId;
@@ -10,7 +11,11 @@ export interface UserDocument {
   updatedAt: Date;
 }
 
-export type PublicUser = Pick<UserDocument, '_id' | 'email' | 'createdAt'>;
+export type PublicUser = {
+  _id?: ObjectId;
+  email: string;
+  createdAt: string | null;
+};
 
 const USERS_COLLECTION_NAME = 'users';
 const EMAIL_UNIQUE_INDEX_NAME = 'email_unique';
@@ -118,6 +123,6 @@ export function toPublicUser(user: UserDocument): PublicUser {
   return {
     _id: user._id,
     email: user.email,
-    createdAt: user.createdAt,
+    createdAt: toUtc7Iso(user.createdAt),
   };
 }
