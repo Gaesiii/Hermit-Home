@@ -10,6 +10,19 @@ class AppConstants {
 
   static const String registerEndpoint = '/api/users/register';
   static const String loginEndpoint = '/api/users/login';
+  static const String forgotPasswordEndpoint = '/api/users/forgot-password';
+  static const String resetPasswordEndpoint = '/api/users/reset-password';
+  static const String validateResetTokenEndpoint =
+      '/api/users/validate-reset-token';
+
+  static const String resetLinkScheme = String.fromEnvironment(
+    'PASSWORD_RESET_DEEPLINK_SCHEME',
+    defaultValue: 'hermithome',
+  );
+  static const String resetLinkHost = String.fromEnvironment(
+    'PASSWORD_RESET_DEEPLINK_HOST',
+    defaultValue: 'reset-password',
+  );
 
   static const String devicesEndpoint = '/api/devices';
   static const String deviceSchedulesEndpoint = '/api/devices/schedules';

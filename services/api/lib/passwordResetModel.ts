@@ -154,12 +154,20 @@ export async function consumePasswordResetToken(
   return result;
 }
 
-export async function findPasswordResetToken(
+
+export async function findActivePasswordResetToken(
   rawToken: string,
 ): Promise<PasswordResetTokenDocument | null> {
   const collection = await getPasswordResetCollection();
+  const now = new Date();
   const tokenHash = hashPasswordResetToken(rawToken);
-  return collection.findOne({ tokenHash });
+
+  return collection.findOne({
+    tokenHash,
+    usedAt: null,
+    expiresAt: { $gt: now },
+  });
+
 }
 
 export async function invalidateAllPasswordResetTokensForUser(userId: ObjectId): Promise<void> {

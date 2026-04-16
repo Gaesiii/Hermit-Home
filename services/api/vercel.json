@@ -24,6 +24,7 @@
     }
   ],
   "rewrites": [
+
     { "source": "/reset-password", "destination": "/api/users/reset-password-link" },
     { "source": "/reset-password/", "destination": "/api/users/reset-password-link" },
     { "source": "/api/(.*)", "destination": "/api/$1" }
