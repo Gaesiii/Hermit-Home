@@ -158,6 +158,72 @@ class AuthService {
     }
   }
 
+  Future<AuthResult> forgotPassword({
+    required String email,
+  }) async {
+    try {
+      final url = _uri(AppConstants.forgotPasswordEndpoint);
+      final body = jsonEncode({'email': email});
+
+      final response = await http
+          .post(url, headers: _jsonHeaders, body: body)
+          .timeout(AppConstants.requestTimeout);
+
+      if (response.statusCode == 200) {
+        return const AuthResult.success();
+      }
+
+      return AuthResult.failure(_extractError(response));
+    } catch (e, st) {
+      return _handleException(e, st);
+    }
+  }
+
+  Future<AuthResult> validateResetToken({
+    required String token,
+  }) async {
+    try {
+      final url = _uri(AppConstants.validateResetTokenEndpoint);
+      final body = jsonEncode({'token': token});
+
+      final response = await http
+          .post(url, headers: _jsonHeaders, body: body)
+          .timeout(AppConstants.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final bodyMap = jsonDecode(response.body) as Map<String, dynamic>;
+        final accountHint = _readNonEmptyString(bodyMap['accountHint']);
+        return AuthResult.resetTokenValidated(accountHint: accountHint);
+      }
+
+      return AuthResult.failure(_extractError(response));
+    } catch (e, st) {
+      return _handleException(e, st);
+    }
+  }
+
+  Future<AuthResult> resetPassword({
+    required String token,
+    required String newPassword,
+  }) async {
+    try {
+      final url = _uri(AppConstants.resetPasswordEndpoint);
+      final body = jsonEncode({'token': token, 'password': newPassword});
+
+      final response = await http
+          .post(url, headers: _jsonHeaders, body: body)
+          .timeout(AppConstants.requestTimeout);
+
+      if (response.statusCode == 200) {
+        return const AuthResult.success();
+      }
+
+      return AuthResult.failure(_extractError(response));
+    } catch (e, st) {
+      return _handleException(e, st);
+    }
+  }
+
   Future<bool> isLoggedIn() async {
     final token = await getToken();
     return token != null && token.isNotEmpty;

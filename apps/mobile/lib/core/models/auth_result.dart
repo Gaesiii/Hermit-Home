@@ -4,6 +4,7 @@ class AuthResult {
   final String? email;
   final String? userId;
   final DateTime? createdAt;
+  final String? resetAccountHint;
   final String? errorMessage;
 
   const AuthResult._({
@@ -12,6 +13,7 @@ class AuthResult {
     this.email,
     this.userId,
     this.createdAt,
+    this.resetAccountHint,
     this.errorMessage,
   });
 
@@ -29,6 +31,15 @@ class AuthResult {
         );
 
   const AuthResult.registerSuccess() : this._(isSuccess: true);
+
+  const AuthResult.success() : this._(isSuccess: true);
+
+  const AuthResult.resetTokenValidated({
+    String? accountHint,
+  }) : this._(
+          isSuccess: true,
+          resetAccountHint: accountHint,
+        );
 
   const AuthResult.failure(String message)
       : this._(isSuccess: false, errorMessage: message);

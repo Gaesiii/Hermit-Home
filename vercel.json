@@ -32,15 +32,22 @@
   "routes": [
     {
       "src": "/reset-password",
+
+
       "dest": "/services/api/api/users/reset-password-link.ts"
     },
     {
       "src": "/reset-password/",
       "dest": "/services/api/api/users/reset-password-link.ts"
+
     },
     {
       "src": "/api/users/forgot-password",
       "dest": "/services/api/api/users/password-reset.ts?mode=forgot"
+    },
+    {
+      "src": "/api/users/validate-reset-token",
+      "dest": "/services/api/api/users/reset-password.ts"
     },
     {
       "src": "/api/users/reset-password",
