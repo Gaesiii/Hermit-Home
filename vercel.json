@@ -27,6 +27,10 @@
     {
       "src": "services/api/api/**/*.ts",
       "use": "@vercel/node"
+    },
+    {
+      "src": "services/api/public/**/*.html",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
@@ -85,6 +89,10 @@
     {
       "src": "/api/auth/(.*)",
       "dest": "/services/api/api/auth/[...nextauth].ts"
+    },
+    {
+      "src": "/",
+      "dest": "/services/api/public/index.html"
     }
   ]
 }
