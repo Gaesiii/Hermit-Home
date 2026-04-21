@@ -1,6 +1,9 @@
 {
   "name": "smart-terrarium-monorepo",
   "private": true,
+  "scripts": {
+    "export:telemetry:csv": "node scripts/export-telemetry-csv.cjs"
+  },
   "packageManager": "npm@11.6.2",
   "workspaces": [
     "packages/*",

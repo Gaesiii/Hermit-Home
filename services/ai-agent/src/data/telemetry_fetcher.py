@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import requests
 
@@ -25,3 +25,25 @@ class TelemetryFetcher:
         except requests.exceptions.RequestException as exc:
             logger.error("Telemetry fetch failed: %s", exc)
             return None
+
+    def get_recent_telemetry(self, limit: int) -> List[Dict[str, Any]]:
+        safe_limit = max(1, min(200, limit))
+        url = f"{self.base_url}/api/devices/{self.device_id}/telemetry"
+        params = {"limit": safe_limit}
+        try:
+            response = requests.get(
+                url,
+                headers=self.headers,
+                params=params,
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            telemetry = payload.get("telemetry")
+            if isinstance(telemetry, list):
+                return telemetry
+            logger.warning("Telemetry payload malformed: missing `telemetry` array.")
+            return []
+        except requests.exceptions.RequestException as exc:
+            logger.error("Recent telemetry fetch failed: %s", exc)
+            return []

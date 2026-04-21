@@ -1,5 +1,5 @@
 import logging
-from typing import Dict
+from typing import Dict, Optional
 
 import requests
 
@@ -16,7 +16,7 @@ class CommandPublisher:
         self.timeout = config.timeout_seconds
         self.headers = {"x-api-key": config.service_api_key}
 
-    def send_threshold_update(self, thresholds: Dict[str, float]) -> bool:
+    def send_threshold_update(self, thresholds: Dict[str, float], reason: Optional[str] = None) -> bool:
         if not thresholds:
             return False
 
@@ -34,7 +34,10 @@ class CommandPublisher:
                 timeout=self.timeout,
             )
             response.raise_for_status()
-            logger.info("Published threshold update: %s", thresholds)
+            if reason:
+                logger.info("Published AI threshold update: %s | reason=%s", thresholds, reason)
+            else:
+                logger.info("Published AI threshold update: %s", thresholds)
             return True
         except requests.exceptions.RequestException as exc:
             logger.error("Threshold publish failed: %s", exc)
