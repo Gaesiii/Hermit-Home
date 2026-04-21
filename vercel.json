@@ -103,6 +103,10 @@
       "dest": "/services/api/api/devices/index.ts"
     },
     {
+      "src": "/api/logs",
+      "dest": "/services/api/api/logs.ts"
+    },
+    {
       "src": "/",
       "dest": "/services/api/public/index.html"
     }
