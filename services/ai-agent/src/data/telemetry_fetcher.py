@@ -17,9 +17,15 @@ class TelemetryFetcher:
         self.headers = {"x-api-key": config.service_api_key}
 
     def get_latest_status(self) -> Optional[Dict[str, Any]]:
-        url = f"{self.base_url}/api/devices/{self.device_id}/status"
+        url = f"{self.base_url}/api/devices/{self.device_id}/data"
+        params = {"type": "latest"}
         try:
-            response = requests.get(url, headers=self.headers, timeout=self.timeout)
+            response = requests.get(
+                url,
+                headers=self.headers,
+                params=params,
+                timeout=self.timeout,
+            )
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as exc:
@@ -28,8 +34,8 @@ class TelemetryFetcher:
 
     def get_recent_telemetry(self, limit: int) -> List[Dict[str, Any]]:
         safe_limit = max(1, min(200, limit))
-        url = f"{self.base_url}/api/devices/{self.device_id}/telemetry"
-        params = {"limit": safe_limit}
+        url = f"{self.base_url}/api/devices/{self.device_id}/data"
+        params = {"type": "history", "limit": safe_limit}
         try:
             response = requests.get(
                 url,

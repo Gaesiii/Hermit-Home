@@ -17,7 +17,7 @@ class TelemetryRepository {
     int limit = 30,
   }) async {
     final uri = Uri.parse(
-      '${AppConstants.apiBaseUrl}/api/devices/$userId/telemetry?limit=$limit',
+      '${AppConstants.apiBaseUrl}/api/devices/$userId/data?type=history&limit=$limit',
     );
 
     final response = await _client.get(

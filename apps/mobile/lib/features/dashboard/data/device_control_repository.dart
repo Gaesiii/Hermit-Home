@@ -17,7 +17,7 @@ class DeviceControlRepository {
     int limit = 100,
   }) async {
     final uri = Uri.parse(
-      '${AppConstants.apiBaseUrl}/api/devices/$userId/control?limit=$limit',
+      '${AppConstants.apiBaseUrl}/api/devices/$userId/action?type=control&limit=$limit',
     );
 
     final response = await _client.get(
@@ -74,8 +74,9 @@ class DeviceControlRepository {
     required String deviceKey,
     required bool enabled,
   }) async {
-    final uri =
-        Uri.parse('${AppConstants.apiBaseUrl}/api/devices/$userId/control');
+    final uri = Uri.parse(
+      '${AppConstants.apiBaseUrl}/api/devices/$userId/action?type=control',
+    );
     final body = jsonEncode({deviceKey: enabled});
 
     final response = await _client

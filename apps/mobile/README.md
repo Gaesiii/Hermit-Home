@@ -4,16 +4,16 @@ This Flutter app boots directly into a unified **User + Device API Test** screen
 
 ## Covered Endpoints
 
-- `POST /api/users/register`
-- `POST /api/users/login`
+- `POST /api/auth?action=register`
+- `POST /api/auth?action=login`
 - `GET /api/devices`
 - `GET /api/devices/schedules`
 - `GET /api/devices/{deviceId}`
 - `PATCH /api/devices/{deviceId}`
-- `GET /api/devices/{deviceId}/status`
-- `GET /api/devices/{deviceId}/control`
-- `POST /api/devices/{deviceId}/control`
-- `POST /api/devices/{deviceId}/override`
+- `GET /api/devices/{deviceId}/data?type=latest`
+- `GET /api/devices/{deviceId}/action?type=control`
+- `POST /api/devices/{deviceId}/action?type=control`
+- `POST /api/devices/{deviceId}/action?type=override`
 - `OPTIONS` probes for key routes
 
 ## Quick Run (Windows)
