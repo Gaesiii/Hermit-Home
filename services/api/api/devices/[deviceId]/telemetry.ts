@@ -4,6 +4,7 @@ import { connectToDatabase } from '../../../lib/mongoClient';
 import { withAuth, AuthenticatedRequest } from '../../../lib/authMiddleware';
 import { handleApiPreflight, methodNotAllowed } from '../../../lib/http';
 import { toUtc7Iso } from '../../../lib/timezone';
+import { insertDiagnosticLog } from '../../../lib/diagnosticLogRepo';
 
 const OBJECT_ID_REGEX = /^[a-f\d]{24}$/i;
 const DEFAULT_LIMIT = 30;
@@ -122,8 +123,35 @@ async function handleGet(
       count: docs.length,
       telemetry: docs.map(normalizeTelemetry),
     });
+
+    await insertDiagnosticLog({
+      deviceId,
+      userId: req.user.userId,
+      source: 'api',
+      category: 'SYNC',
+      status: 'PASS',
+      message: `[PASS] Telemetry sync completed (${docs.length} rows).`,
+      metadata: {
+        endpoint: '/api/devices/[deviceId]/telemetry',
+        method: 'GET',
+        limit,
+      },
+    });
   } catch (error: unknown) {
     console.error('[GET /api/devices/[deviceId]/telemetry]', error);
+    await insertDiagnosticLog({
+      deviceId,
+      userId: req.user.userId,
+      source: 'api',
+      category: 'SYNC',
+      status: 'FAIL',
+      message: '[FAIL] Telemetry sync request failed.',
+      metadata: {
+        endpoint: '/api/devices/[deviceId]/telemetry',
+        method: 'GET',
+        error: (error as Error).message,
+      },
+    });
     res.status(500).json({ error: 'An unexpected error occurred. Please try again.' });
   }
 }

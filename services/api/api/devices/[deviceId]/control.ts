@@ -12,6 +12,7 @@ import { publishCommand } from '../../../lib/mqttPublisher';
 import { MIST_SAFETY_LOCK_ENABLED, sanitizeRelayMap } from '../../../lib/mistSafety';
 import { handleApiPreflight, methodNotAllowed } from '../../../lib/http';
 import { toUtc7Iso } from '../../../lib/timezone';
+import { insertCommandPendingLogs, insertDiagnosticLog } from '../../../lib/diagnosticLogRepo';
 
 const OBJECT_ID_REGEX = /^[a-f\d]{24}$/i;
 
@@ -71,9 +72,35 @@ async function handleGet(
       _id: entry._id?.toString?.() ?? entry._id,
       createdAt: toUtc7Iso(entry.createdAt) ?? entry.createdAt,
     }));
+    await insertDiagnosticLog({
+      deviceId,
+      userId: req.user.userId,
+      source: 'api',
+      category: 'SYNC',
+      status: 'PASS',
+      message: `[PASS] Control history sync succeeded for device ${deviceId}.`,
+      metadata: {
+        endpoint: '/api/devices/[deviceId]/control',
+        method: 'GET',
+        count: normalizedHistory.length,
+      },
+    });
     res.status(200).json({ deviceId, history: normalizedHistory });
   } catch (error: unknown) {
     console.error('[GET /api/devices/[deviceId]/control]', error);
+    await insertDiagnosticLog({
+      deviceId,
+      userId: req.user.userId,
+      source: 'api',
+      category: 'SYNC',
+      status: 'FAIL',
+      message: `[FAIL] Control history sync failed for device ${deviceId}.`,
+      metadata: {
+        endpoint: '/api/devices/[deviceId]/control',
+        method: 'GET',
+        error: (error as Error).message,
+      },
+    });
     res.status(500).json({ error: 'An unexpected error occurred. Please try again.' });
   }
 }
@@ -130,8 +157,32 @@ async function handlePost(
 
   try {
     await publishCommand(deviceId, commandPayload);
+    await insertCommandPendingLogs({
+      deviceId,
+      userId: req.user.userId,
+      source: 'api',
+      stateUpdate: safeStateUpdate as Record<string, boolean>,
+      metadata: {
+        endpoint: '/api/devices/[deviceId]/control',
+        method: 'POST',
+      },
+    });
   } catch (error: unknown) {
     console.error('[POST /api/devices/[deviceId]/control] MQTT publish failed', error);
+    await insertDiagnosticLog({
+      deviceId,
+      userId: req.user.userId,
+      source: 'api',
+      category: 'COMMAND',
+      status: 'FAIL',
+      message: `[FAIL] Command publish failed before reaching Edge Device.`,
+      metadata: {
+        endpoint: '/api/devices/[deviceId]/control',
+        method: 'POST',
+        stateUpdate: safeStateUpdate,
+        error: (error as Error).message,
+      },
+    });
     res.status(502).json({
       error: 'Failed to publish command to the device. The relay state has not changed.',
     });

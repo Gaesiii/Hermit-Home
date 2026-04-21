@@ -3,6 +3,7 @@ import { connectToDatabase } from '../../../lib/mongoClient';
 import { verifyAuth } from '../../../lib/authMiddleware';
 import { handleApiPreflight, methodNotAllowed } from '../../../lib/http';
 import { toUtc7Iso } from '../../../lib/timezone';
+import { insertDiagnosticLog } from '../../../lib/diagnosticLogRepo';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const allowedMethods = ['GET'] as const;
@@ -70,6 +71,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .toArray();
 
     if (latest.length === 0) {
+      await insertDiagnosticLog({
+        deviceId,
+        userId: uid,
+        source: 'api',
+        category: 'TELEMETRY',
+        status: 'FAIL',
+        message: `[FAIL] Latest telemetry fetch returned no data.`,
+        metadata: {
+          endpoint: '/api/devices/[deviceId]/status',
+          method: 'GET',
+        },
+      });
       return res.status(404).json({ error: 'No data found for this device' });
     }
 
@@ -79,8 +92,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       timestamp: toUtc7Iso(latestDocument.timestamp as Date | string) ?? latestDocument.timestamp,
     };
 
+    await insertDiagnosticLog({
+      deviceId,
+      userId: uid,
+      source: 'api',
+      category: 'TELEMETRY',
+      status: 'PASS',
+      message: `[PASS] Latest telemetry fetched successfully.`,
+      metadata: {
+        endpoint: '/api/devices/[deviceId]/status',
+        method: 'GET',
+      },
+    });
+
     return res.status(200).json(normalized);
   } catch (error) {
+    await insertDiagnosticLog({
+      deviceId,
+      userId: uid,
+      source: 'api',
+      category: 'TELEMETRY',
+      status: 'FAIL',
+      message: `[FAIL] Latest telemetry fetch failed.`,
+      metadata: {
+        endpoint: '/api/devices/[deviceId]/status',
+        method: 'GET',
+        error: (error as Error).message,
+      },
+    });
     return res.status(500).json({ error: 'Database connection failed' });
   }
 }

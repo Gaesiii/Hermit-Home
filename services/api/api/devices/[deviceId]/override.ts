@@ -4,6 +4,7 @@ import { CommandPayload } from '@smart-terrarium/shared-types';
 import { verifyAuth } from '../../../lib/authMiddleware';
 import { MIST_SAFETY_LOCK_ENABLED, sanitizeCommandPayload } from '../../../lib/mistSafety';
 import { handleApiPreflight, methodNotAllowed } from '../../../lib/http';
+import { insertCommandPendingLogs, insertDiagnosticLog } from '../../../lib/diagnosticLogRepo';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const allowedMethods = ['POST'] as const;
@@ -27,6 +28,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { deviceId } = req.query;
   const command = req.body as CommandPayload;
+  const isServiceCall = typeof req.headers['x-api-key'] === 'string';
 
   if (!command || typeof command !== 'object' || Array.isArray(command)) {
     return res.status(400).json({ error: 'Request body must be a JSON object' });
@@ -55,6 +57,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     await publishCommand(deviceId, safeCommand);
 
+    if (safeCommand.devices && Object.keys(safeCommand.devices).length > 0) {
+      await insertCommandPendingLogs({
+        deviceId,
+        userId: uid,
+        source: isServiceCall ? 'ai-agent' : 'api',
+        stateUpdate: safeCommand.devices as Record<string, boolean>,
+        metadata: {
+          endpoint: '/api/devices/[deviceId]/override',
+          method: 'POST',
+          userOverride: safeCommand.user_override,
+          byServiceKey: isServiceCall,
+        },
+      });
+    } else {
+      await insertDiagnosticLog({
+        deviceId,
+        userId: uid,
+        source: isServiceCall ? 'ai-agent' : 'api',
+        category: isServiceCall ? 'AI' : 'COMMAND',
+        status: 'INFO',
+        message: safeCommand.user_override
+          ? '[INFO] Override command accepted.'
+          : '[INFO] Threshold update accepted by API.',
+        metadata: {
+          endpoint: '/api/devices/[deviceId]/override',
+          method: 'POST',
+          command: safeCommand,
+          byServiceKey: isServiceCall,
+        },
+      });
+    }
+
     return res.status(200).json({
       success: true,
       device: deviceId,
@@ -63,6 +97,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   } catch (error) {
     console.error('MQTT Error:', error);
+    await insertDiagnosticLog({
+      deviceId,
+      userId: uid,
+      source: isServiceCall ? 'ai-agent' : 'api',
+      category: isServiceCall ? 'AI' : 'COMMAND',
+      status: 'FAIL',
+      message: '[FAIL] Override publish to Edge Device failed.',
+      metadata: {
+        endpoint: '/api/devices/[deviceId]/override',
+        method: 'POST',
+        command: safeCommand,
+        byServiceKey: isServiceCall,
+        error: (error as Error).message,
+      },
+    });
     return res.status(500).json({ error: 'Failed to communicate with device' });
   }
 }

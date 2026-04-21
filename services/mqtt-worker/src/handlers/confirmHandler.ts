@@ -1,4 +1,5 @@
 import { logger } from '../utils/logger';
+import { acknowledgePendingCommand, insertDiagnosticLog } from '../db/diagnosticLogRepo';
 
 const CONFIRM_TOPIC_PREFIX = 'terrarium/confirm/';
 const MONGO_OBJECT_ID_REGEX = /^[a-f\d]{24}$/i;
@@ -21,11 +22,11 @@ function getDeviceIdFromConfirmTopic(topic: string): string | null {
   return deviceId;
 }
 
-export function handleConfirm(
+export async function handleConfirm(
   topic: string,
   message: Buffer,
   allowedDeviceIds: ReadonlySet<string> | null
-): void {
+): Promise<void> {
   const deviceId = getDeviceIdFromConfirmTopic(topic);
   if (!deviceId) {
     logger.warn({ topic }, 'Dropped confirm message due to invalid topic format');
@@ -50,6 +51,18 @@ export function handleConfirm(
     // Offline LWT from ESP32 on disconnect.
     if (parsed.status === 'offline') {
       logger.warn({ deviceId }, 'ESP32 reported offline status');
+      await insertDiagnosticLog({
+        deviceId,
+        userId: null,
+        source: 'mqtt-worker',
+        category: 'ACK',
+        status: 'FAIL',
+        message: '[FAIL] Edge Device reported offline status.',
+        metadata: {
+          topic,
+          payload: parsed,
+        },
+      });
       return;
     }
 
@@ -66,7 +79,26 @@ export function handleConfirm(
       { deviceId, device: parsed.device, state: parsed.state },
       'Received ESP32 override acknowledgement'
     );
+
+    await acknowledgePendingCommand({
+      deviceId,
+      relay: parsed.device,
+      acknowledgedState: parsed.state,
+    });
   } catch (error: unknown) {
     logger.error({ err: error, topic, payload: raw }, 'Failed to parse confirm payload');
+    await insertDiagnosticLog({
+      deviceId,
+      userId: null,
+      source: 'mqtt-worker',
+      category: 'ACK',
+      status: 'FAIL',
+      message: '[FAIL] Failed to parse edge acknowledgement payload.',
+      metadata: {
+        topic,
+        payload: raw,
+        error: (error as Error).message,
+      },
+    });
   }
 }

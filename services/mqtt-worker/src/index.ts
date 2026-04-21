@@ -160,7 +160,7 @@ async function bootstrap(): Promise<void> {
   mqttClient.on('message', (topic: string, message: Buffer) => {
     if (!topic.startsWith('terrarium/telemetry/')) {
       if (topic.startsWith('terrarium/confirm/')) {
-        handleConfirm(topic, message, allowedDeviceIdSet);
+        void handleConfirm(topic, message, allowedDeviceIdSet);
       }
       return;
     }

@@ -199,6 +199,208 @@
       opacity: 0.86;
     }
 
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .console-toggle {
+      width: 34px;
+      height: 34px;
+      border: 0;
+      border-radius: 10px;
+      background: #0d4f73;
+      color: #ffffff;
+      font-size: 17px;
+      line-height: 1;
+      cursor: pointer;
+      box-shadow: 0 6px 16px #0d4f7340;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+    }
+
+    .console-toggle:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px #0d4f7361;
+    }
+
+    .console-toggle:active {
+      transform: translateY(0);
+    }
+
+    .console-toggle.has-fail {
+      background: #8c1c14;
+      animation: pulse-fail 1.2s ease-in-out infinite;
+    }
+
+    .console-overlay {
+      position: fixed;
+      inset: 0;
+      background: #03223887;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 30;
+      padding: 16px;
+    }
+
+    .console-overlay.visible {
+      display: flex;
+    }
+
+    .console-panel {
+      width: min(940px, 96vw);
+      max-height: 84vh;
+      background: linear-gradient(180deg, #081f30 0%, #0c2b42 100%);
+      border-radius: 16px;
+      border: 1px solid #3b8ab130;
+      color: #c8e9fb;
+      box-shadow: 0 22px 48px #00131f85;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .console-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-bottom: 1px solid #4ca4cf28;
+      background: #0d2f48;
+      gap: 8px;
+    }
+
+    .console-title {
+      font-weight: 700;
+      font-size: 0.97rem;
+      letter-spacing: 0.02em;
+    }
+
+    .console-subtitle {
+      font-size: 0.78rem;
+      opacity: 0.78;
+      margin-top: 2px;
+    }
+
+    .console-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .console-btn {
+      border: 1px solid #5bb1d247;
+      border-radius: 8px;
+      background: #113b57;
+      color: #dbf3ff;
+      padding: 6px 10px;
+      font-family: inherit;
+      font-size: 0.76rem;
+      cursor: pointer;
+    }
+
+    .console-btn:hover {
+      background: #184966;
+    }
+
+    .console-status {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 10px 12px;
+      background: #0b2740;
+      border-bottom: 1px solid #4ca4cf1f;
+      font-size: 0.76rem;
+    }
+
+    .status-chip {
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #1a4662;
+      color: #d8effd;
+      border: 1px solid #69bbdd2b;
+    }
+
+    .status-chip.pass {
+      background: #1b4b2a;
+      border-color: #8df1af42;
+      color: #b5f2ca;
+    }
+
+    .status-chip.fail {
+      background: #5c1f1f;
+      border-color: #f18a8a5c;
+      color: #ffd2d2;
+    }
+
+    .console-log-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      overflow: auto;
+      max-height: 60vh;
+      font-family: "Consolas", "Courier New", monospace;
+      font-size: 0.79rem;
+      background: #061a29;
+    }
+
+    .console-log-item {
+      display: grid;
+      grid-template-columns: 66px 58px 80px 1fr;
+      gap: 8px;
+      align-items: start;
+      border-bottom: 1px solid #27516b30;
+      padding: 8px 10px;
+      line-height: 1.35;
+    }
+
+    .log-time {
+      color: #8ec7e1;
+      opacity: 0.88;
+    }
+
+    .log-status {
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
+    .log-status.PASS {
+      color: #8af0b1;
+    }
+
+    .log-status.FAIL {
+      color: #ffa9a9;
+    }
+
+    .log-status.PENDING {
+      color: #ffe19e;
+    }
+
+    .log-status.INFO {
+      color: #9fdefb;
+    }
+
+    .log-source {
+      color: #acd7ee;
+      text-transform: uppercase;
+      font-size: 0.68rem;
+      letter-spacing: 0.06em;
+      opacity: 0.86;
+    }
+
+    .log-message {
+      color: #d6edf9;
+      word-break: break-word;
+    }
+
+    .console-empty {
+      padding: 14px;
+      color: #abd4e8;
+      opacity: 0.84;
+      font-family: "Consolas", "Courier New", monospace;
+      font-size: 0.8rem;
+    }
+
     .decor-layer,
     .item-layer,
     .crab-layer {
@@ -605,6 +807,16 @@
         transform: rotate(360deg) translateY(0);
       }
     }
+
+    @keyframes pulse-fail {
+      0%,
+      100% {
+        box-shadow: 0 6px 16px #7f1f1f3d;
+      }
+      50% {
+        box-shadow: 0 8px 18px #d73b3b99;
+      }
+    }
   </style>
 </head>
 <body>
@@ -618,7 +830,16 @@
     <div class="sand"></div>
 
     <section class="title-card">
-      <h1>Hermit Home Beach</h1>
+      <div class="title-row">
+        <h1>Hermit Home Beach</h1>
+        <button
+          id="consoleToggle"
+          class="console-toggle"
+          type="button"
+          aria-label="Open live diagnostic console"
+          title="Live Diagnostic Console"
+        >&#x2328;</button>
+      </div>
       <p>5 playful hermits roaming the sand.</p>
     </section>
 
@@ -645,6 +866,24 @@
     <div class="crab-layer" id="crabLayer"></div>
   </main>
 
+  <aside id="consoleOverlay" class="console-overlay" aria-hidden="true">
+    <section class="console-panel" role="dialog" aria-modal="true" aria-label="Live Diagnostic Console">
+      <header class="console-head">
+        <div>
+          <div class="console-title">Live Diagnostic Console</div>
+          <div class="console-subtitle">Telemetry sync, command execution, AI actions, auth validation</div>
+        </div>
+        <div class="console-actions">
+          <button id="consoleRefreshBtn" class="console-btn" type="button">Refresh</button>
+          <button id="consoleCloseBtn" class="console-btn" type="button">Close</button>
+        </div>
+      </header>
+      <div id="consoleStatusBar" class="console-status"></div>
+      <ul id="consoleLogList" class="console-log-list"></ul>
+      <div id="consoleEmpty" class="console-empty" hidden>Waiting for diagnostic logs...</div>
+    </section>
+  </aside>
+
   <script>
     (function () {
       const crabCount = 5;
@@ -653,12 +892,187 @@
       const beachScene = document.getElementById("beachScene");
       const itemLayer = document.getElementById("itemLayer");
       const crabLayer = document.getElementById("crabLayer");
+      const consoleToggle = document.getElementById("consoleToggle");
+      const consoleOverlay = document.getElementById("consoleOverlay");
+      const consoleCloseBtn = document.getElementById("consoleCloseBtn");
+      const consoleRefreshBtn = document.getElementById("consoleRefreshBtn");
+      const consoleStatusBar = document.getElementById("consoleStatusBar");
+      const consoleLogList = document.getElementById("consoleLogList");
+      const consoleEmpty = document.getElementById("consoleEmpty");
 
       const items = [];
       const crabs = [];
+      const DIAGNOSTIC_POLL_MS = 4000;
+      let diagnosticsOnline = false;
+      let diagnosticsFetchAt = null;
 
       const randomBetween = (min, max) => Math.random() * (max - min) + min;
       const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+      const toClock = (isoValue) => {
+        if (!isoValue) {
+          return "--:--:--";
+        }
+        const date = new Date(isoValue);
+        if (Number.isNaN(date.getTime())) {
+          return "--:--:--";
+        }
+        return date.toLocaleTimeString([], { hour12: false });
+      };
+
+      const iconState = (state) => (state ? "ON" : "OFF");
+
+      const setConsoleIconFailState = (hasFail) => {
+        if (!consoleToggle) {
+          return;
+        }
+        consoleToggle.classList.toggle("has-fail", hasFail);
+      };
+
+      const renderStatusBar = (logs, hasError) => {
+        if (!consoleStatusBar) {
+          return;
+        }
+        const counters = { PASS: 0, FAIL: 0, PENDING: 0, INFO: 0 };
+        for (const log of logs) {
+          const key = typeof log.status === "string" ? log.status.toUpperCase() : "INFO";
+          if (key in counters) {
+            counters[key] += 1;
+          }
+        }
+
+        const sourceText = diagnosticsOnline && !hasError ? "Live" : "Disconnected";
+        const sourceClass = diagnosticsOnline && !hasError ? "pass" : "fail";
+        const refreshedText = diagnosticsFetchAt
+          ? "Updated " + diagnosticsFetchAt.toLocaleTimeString([], { hour12: false })
+          : "Waiting";
+
+        consoleStatusBar.innerHTML =
+          '<span class="status-chip ' + sourceClass + '">Stream: ' + sourceText + '</span>' +
+          '<span class="status-chip pass">PASS: ' + counters.PASS + '</span>' +
+          '<span class="status-chip fail">FAIL: ' + counters.FAIL + '</span>' +
+          '<span class="status-chip">PENDING: ' + counters.PENDING + '</span>' +
+          '<span class="status-chip">INFO: ' + counters.INFO + '</span>' +
+          '<span class="status-chip">' + refreshedText + '</span>';
+      };
+
+      const renderLogs = (logs, errorMessage) => {
+        if (!consoleLogList || !consoleEmpty) {
+          return;
+        }
+
+        consoleLogList.innerHTML = "";
+        if (errorMessage) {
+          const line = document.createElement("li");
+          line.className = "console-log-item";
+
+          const time = document.createElement("span");
+          time.className = "log-time";
+          time.textContent = "--:--:--";
+          line.appendChild(time);
+
+          const status = document.createElement("span");
+          status.className = "log-status FAIL";
+          status.textContent = "FAIL";
+          line.appendChild(status);
+
+          const source = document.createElement("span");
+          source.className = "log-source";
+          source.textContent = "api";
+          line.appendChild(source);
+
+          const message = document.createElement("span");
+          message.className = "log-message";
+          message.textContent = "[FAIL] Could not load diagnostic logs: " + errorMessage;
+          line.appendChild(message);
+
+          consoleLogList.appendChild(line);
+          consoleEmpty.hidden = true;
+          setConsoleIconFailState(true);
+          return;
+        }
+
+        if (!logs.length) {
+          consoleEmpty.hidden = false;
+          setConsoleIconFailState(false);
+          return;
+        }
+        consoleEmpty.hidden = true;
+
+        let hasFail = false;
+        for (const log of logs) {
+          const statusText = (log.status || "INFO").toUpperCase();
+          if (statusText === "FAIL") {
+            hasFail = true;
+          }
+
+          const line = document.createElement("li");
+          line.className = "console-log-item";
+
+          const time = document.createElement("span");
+          time.className = "log-time";
+          time.textContent = toClock(log.createdAt);
+          line.appendChild(time);
+
+          const status = document.createElement("span");
+          status.className = "log-status " + statusText;
+          status.textContent = statusText;
+          line.appendChild(status);
+
+          const source = document.createElement("span");
+          source.className = "log-source";
+          source.textContent = (log.source || "system").toString();
+          line.appendChild(source);
+
+          const message = document.createElement("span");
+          message.className = "log-message";
+          const relayText = log.relay ? " [" + log.relay + "=" + iconState(Boolean(log.expectedState)) + "]" : "";
+          const deviceText = log.deviceId ? " {device:" + log.deviceId + "}" : "";
+          message.textContent = (log.message || "[INFO] Event") + relayText + deviceText;
+          line.appendChild(message);
+
+          consoleLogList.appendChild(line);
+        }
+
+        setConsoleIconFailState(hasFail);
+      };
+
+      const fetchDiagnostics = async () => {
+        try {
+          const response = await fetch("/api/logs?limit=140", { cache: "no-store" });
+          if (!response.ok) {
+            throw new Error("HTTP " + response.status);
+          }
+          const payload = await response.json();
+          const logs = Array.isArray(payload.logs) ? payload.logs : [];
+          diagnosticsOnline = true;
+          diagnosticsFetchAt = new Date();
+          renderStatusBar(logs, false);
+          renderLogs(logs, null);
+        } catch (error) {
+          diagnosticsOnline = false;
+          diagnosticsFetchAt = new Date();
+          const message = error instanceof Error ? error.message : "unknown error";
+          renderStatusBar([], true);
+          renderLogs([], message);
+        }
+      };
+
+      const openConsole = () => {
+        if (!consoleOverlay) {
+          return;
+        }
+        consoleOverlay.classList.add("visible");
+        consoleOverlay.setAttribute("aria-hidden", "false");
+        fetchDiagnostics();
+      };
+
+      const closeConsole = () => {
+        if (!consoleOverlay) {
+          return;
+        }
+        consoleOverlay.classList.remove("visible");
+        consoleOverlay.setAttribute("aria-hidden", "true");
+      };
 
       const bounds = () => {
         const width = beachScene.clientWidth;
@@ -864,8 +1278,32 @@
         requestAnimationFrame(tick);
       };
 
+      if (consoleToggle) {
+        consoleToggle.addEventListener("click", openConsole);
+      }
+      if (consoleCloseBtn) {
+        consoleCloseBtn.addEventListener("click", closeConsole);
+      }
+      if (consoleRefreshBtn) {
+        consoleRefreshBtn.addEventListener("click", fetchDiagnostics);
+      }
+      if (consoleOverlay) {
+        consoleOverlay.addEventListener("click", (event) => {
+          if (event.target === consoleOverlay) {
+            closeConsole();
+          }
+        });
+      }
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          closeConsole();
+        }
+      });
+
       start();
       addEventListener("resize", reflow);
+      fetchDiagnostics();
+      setInterval(fetchDiagnostics, DIAGNOSTIC_POLL_MS);
     })();
   </script>
 </body>
