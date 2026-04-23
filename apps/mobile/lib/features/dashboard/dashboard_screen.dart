@@ -36,8 +36,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   bool _isSyncingData = false;
 
   // --- BIẾN STATE CHO TAB HỒ SƠ ---
-  String _userEmail = "Đang tải...";
-  String _userName = "Đang tải...";
+  String _userIdDisplay = "Loading...";
+  String _userName = "User";
 
   // --- BIẾN STATE CHO TAB LỊCH SỬ ---
   double? _currentTemp;
@@ -126,54 +126,94 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   // Lấy User từ Token hoặc DB
+  String? _extractUserIdFromToken(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return null;
+
+      String payload = parts[1];
+      while (payload.length % 4 != 0) {
+        payload += '=';
+      }
+
+      final decodedPayload = utf8.decode(base64Url.decode(payload));
+      final payloadMap = jsonDecode(decodedPayload);
+      if (payloadMap is! Map<String, dynamic>) return null;
+
+      final userIdRaw = payloadMap['userId'] ?? payloadMap['sub'];
+      if (userIdRaw is! String) return null;
+
+      final userId = userIdRaw.trim();
+      return userId.isEmpty ? null : userId;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _loadUserProfile() async {
     try {
       final token = await _authService.getToken();
-      if (token != null && token.isNotEmpty) {
-        final parts = token.split('.');
-        if (parts.length == 3) {
-          String payload = parts[1];
-          while (payload.length % 4 != 0) {
-            payload += '=';
-          }
-          final decodedPayload = utf8.decode(base64Url.decode(payload));
-          final payloadMap = jsonDecode(decodedPayload);
+      final storedUserId = (await _authService.getUserId())?.trim();
+      final tokenUserId = token == null ? null : _extractUserIdFromToken(token);
+      String? telemetryUserId;
 
-          final emailExtracted =
-              payloadMap['email']?.toString() ?? "phuc@hermit-home.com";
+      if (token != null &&
+          storedUserId != null &&
+          storedUserId.isNotEmpty) {
+        try {
+          final telemetryUrl = Uri.parse(
+            '${AppConstants.apiBaseUrl}/api/devices/$storedUserId/telemetry?limit=1',
+          );
+          final teleResponse = await http.get(telemetryUrl, headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          });
 
-          if (mounted) {
-            setState(() {
-              _userEmail = emailExtracted;
-              _userName = emailExtracted.split('@')[0];
-            });
+          if (teleResponse.statusCode == 200) {
+            final decoded = jsonDecode(teleResponse.body);
+            if (decoded is Map<String, dynamic>) {
+              final teleList = decoded['telemetry'];
+              if (teleList is List && teleList.isNotEmpty) {
+                final first = teleList.first;
+                if (first is Map<String, dynamic>) {
+                  final fromDb = first['userId']?.toString().trim();
+                  if (fromDb != null && fromDb.isNotEmpty) {
+                    telemetryUserId = fromDb;
+                  }
+                }
+              }
+            }
           }
-          return;
+        } catch (_) {
+          // Keep fallback sources when telemetry lookup fails.
         }
       }
 
-      final userId = await _authService.getUserId();
-      if (userId != null && token != null) {
-        final url = Uri.parse('${AppConstants.apiBaseUrl}/api/users/$userId');
-        final response =
-            await http.get(url, headers: {'Authorization': 'Bearer $token'});
-        if (response.statusCode == 200) {
-          final emailFromDB = jsonDecode(response.body)['email']?.toString() ??
-              "phuc@hermit-home.com";
-          if (mounted) {
-            setState(() {
-              _userEmail = emailFromDB;
-              _userName = emailFromDB.split('@')[0];
-            });
-          }
+      final resolvedUserId = (telemetryUserId != null && telemetryUserId.isNotEmpty)
+          ? telemetryUserId
+          : (storedUserId != null && storedUserId.isNotEmpty)
+              ? storedUserId
+              : tokenUserId;
+
+      if (!mounted) return;
+
+      setState(() {
+        if (resolvedUserId != null && resolvedUserId.isNotEmpty) {
+          _userIdDisplay = resolvedUserId;
+          _userName = resolvedUserId.length >= 6
+              ? resolvedUserId.substring(0, 6)
+              : resolvedUserId;
+        } else {
+          _userIdDisplay = 'User ID unavailable';
+          _userName = 'User';
         }
-      }
+      });
     } catch (e) {
-      debugPrint("Lỗi tải thông tin: $e");
+      debugPrint('Lỗi tải thông tin User ID: $e');
       if (mounted) {
         setState(() {
-          _userEmail = "phuc@hermit-home.com";
-          _userName = "Phúc";
+          _userIdDisplay = 'User ID unavailable';
+          _userName = 'User';
         });
       }
     }
@@ -1096,7 +1136,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     const SizedBox(height: 5),
                     FittedBox(
                       fit: BoxFit.scaleDown,
-                      child: Text(_userEmail,
+                      child: Text('User ID: $_userIdDisplay',
                           style: TextStyle(
                               color: textMain.withOpacity(0.7), fontSize: 14)),
                     ),
