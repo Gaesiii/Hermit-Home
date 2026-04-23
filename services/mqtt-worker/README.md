@@ -30,5 +30,5 @@ Behavior:
 - First trigger runs immediately at worker startup.
 - Next triggers run every `AGENT_CONTROL_INTERVAL_MS`.
 - In-flight guard prevents overlapping calls.
-- If `DEVICE_ID` or `ALLOWED_DEVICE_IDS` is set, worker auto-injects `deviceId` into default POST body.
-- If no deviceId is sent, Vercel endpoint will auto-infer target from latest telemetry.
+- Worker does not auto-inject `deviceId` into POST body.
+- If no `deviceId` is sent, Vercel endpoint auto-resolves multiple targets from latest telemetry.

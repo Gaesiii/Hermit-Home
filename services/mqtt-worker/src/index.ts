@@ -296,22 +296,11 @@ function startAgentControlTriggerLoop(): void {
   const method = parseAgentControlMethod(process.env.AGENT_CONTROL_METHOD);
   const apiKey = process.env.AGENT_CONTROL_API_KEY?.trim();
   const bodyRaw = process.env.AGENT_CONTROL_BODY_JSON?.trim();
-  const defaultDeviceIdCandidate = process.env.DEVICE_ID?.trim();
-  const defaultAllowedDeviceIdCandidate = process.env.ALLOWED_DEVICE_IDS
-    ?.split(',')
-    .map((id) => id.trim())
-    .find((id) => DEVICE_ID_REGEX.test(id));
 
   const defaultBodyPayload: Record<string, unknown> = {
     source: 'mqtt-worker',
     trigger: 'interval',
   };
-
-  if (defaultDeviceIdCandidate && DEVICE_ID_REGEX.test(defaultDeviceIdCandidate)) {
-    defaultBodyPayload.deviceId = defaultDeviceIdCandidate;
-  } else if (defaultAllowedDeviceIdCandidate) {
-    defaultBodyPayload.deviceId = defaultAllowedDeviceIdCandidate;
-  }
 
   let bodyToSend = JSON.stringify(defaultBodyPayload);
   if (bodyRaw) {

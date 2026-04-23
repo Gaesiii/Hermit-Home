@@ -63,7 +63,18 @@
       aspect-ratio: 1;
       border-radius: 50%;
       background: radial-gradient(circle at 35% 30%, #fff7cb 0 25%, var(--sun) 45%, #ffb935 100%);
+      border: 3px solid #ffe7aa;
+      overflow: hidden;
       box-shadow: 0 0 40px #ffd15bbb;
+    }
+
+    .sun .sun-photo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      border-radius: inherit;
+      display: block;
     }
 
     .cloud {
@@ -822,7 +833,9 @@
 <body>
   <main class="beach-scene" id="beachScene">
     <div class="sky"></div>
-    <div class="sun"></div>
+    <div class="sun">
+      <img class="sun-photo" src="/images/p.webp" alt="Hermit photo sun" />
+    </div>
     <div class="cloud one"></div>
     <div class="cloud two"></div>
     <div class="cloud three"></div>

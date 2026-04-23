@@ -17,6 +17,8 @@ const MAX_RECENT_WINDOW_SIZE = 120;
 const DEFAULT_EMERGENCY_RELEASE_DELAY_MS = 2000;
 const DEFAULT_MIST_SAFETY_LOCK_ENABLED = true;
 const DEFAULT_CSV_SAMPLE_SIZE = 600;
+const DEFAULT_AGENT_CONTROL_MAX_DEVICES = 30;
+const MAX_AGENT_CONTROL_MAX_DEVICES = 200;
 
 const SAFETY_THRESHOLDS = {
   temperature: { min: 24.0, max: 29.0 },
@@ -75,6 +77,11 @@ type CsvContext = {
   temperatureAvg: number | null;
   humidityAvg: number | null;
   luxAvg: number | null;
+};
+
+type DeviceControlResult = {
+  status: number;
+  payload: Record<string, unknown>;
 };
 
 function readQueryValue(value: string | string[] | undefined): string | null {
@@ -140,7 +147,40 @@ function round(value: number, digits: number): number {
 
 function parseAllowedDeviceIdsFromEnv(): string[] {
   const raw = process.env.ALLOWED_DEVICE_IDS || '';
-  return [...new Set(raw.split(',').map((item) => item.trim()).filter(Boolean))];
+  return [
+    ...new Set(
+      raw
+        .split(',')
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0 && isValidDeviceId(item)),
+    ),
+  ];
+}
+
+function parseDeviceIdList(raw: unknown): string[] {
+  if (typeof raw === 'string') {
+    return raw
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  if (Array.isArray(raw)) {
+    return raw
+      .filter((item): item is string => typeof item === 'string')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+function dedupeDeviceIds(deviceIds: string[]): string[] {
+  return [...new Set(deviceIds)];
+}
+
+function isValidDeviceId(deviceId: string): boolean {
+  return DEVICE_ID_REGEX.test(deviceId);
 }
 
 function parseBodyObject(body: unknown): Record<string, unknown> {
@@ -150,64 +190,140 @@ function parseBodyObject(body: unknown): Record<string, unknown> {
   return {};
 }
 
-function resolveTargetDeviceId(
-  req: AuthenticatedRequest,
-  body: Record<string, unknown>,
-): { deviceId: string | null; errorMessage: string | null } {
-  const bodyDeviceId = typeof body.deviceId === 'string' ? body.deviceId.trim() : '';
-  const queryDeviceId = readQueryValue(req.query.deviceId)?.trim() ?? '';
-  const envDeviceId = (process.env.AGENT_DEVICE_ID || process.env.DEVICE_ID || '').trim();
-  const allowedFromEnv = parseAllowedDeviceIdsFromEnv();
-
-  const fallbackAllowedDeviceId = allowedFromEnv.length === 1 ? allowedFromEnv[0] : '';
-  const deviceId = bodyDeviceId || queryDeviceId || envDeviceId || fallbackAllowedDeviceId;
-
-  if (!deviceId) {
-    return {
-      deviceId: null,
-      errorMessage:
-        'Missing target device ID.',
-    };
+async function listTelemetryDeviceIds(
+  db: Db,
+  maxDevices: number,
+  allowedDeviceIds: string[] | null,
+): Promise<string[]> {
+  const pipeline: Record<string, unknown>[] = [];
+  if (allowedDeviceIds && allowedDeviceIds.length > 0) {
+    pipeline.push({
+      $match: { userId: { $in: allowedDeviceIds } },
+    });
   }
 
-  if (!DEVICE_ID_REGEX.test(deviceId)) {
-    return {
-      deviceId: null,
-      errorMessage: 'Invalid deviceId format. Expected a 24-character hex string.',
-    };
-  }
+  pipeline.push(
+    {
+      $group: {
+        _id: '$userId',
+        lastTelemetryAt: { $max: '$timestamp' },
+      },
+    },
+    {
+      $sort: { lastTelemetryAt: -1 },
+    },
+    {
+      $limit: maxDevices,
+    },
+  );
 
-  if (allowedFromEnv.length > 0 && !allowedFromEnv.includes(deviceId)) {
-    return {
-      deviceId: null,
-      errorMessage: 'Requested deviceId is not permitted by ALLOWED_DEVICE_IDS.',
-    };
-  }
+  const docs = await db
+    .collection<TelemetryDocument>('telemetry')
+    .aggregate<{ _id: string }>(pipeline)
+    .toArray();
 
-  return { deviceId, errorMessage: null };
+  return docs
+    .map((doc) => doc._id)
+    .filter((deviceId) => typeof deviceId === 'string' && isValidDeviceId(deviceId));
 }
 
-async function resolveLatestTelemetryDeviceId(
-  db: Db,
-  allowedDeviceIds: string[],
-): Promise<string | null> {
-  const filter: Record<string, unknown> = {};
-  if (allowedDeviceIds.length > 0) {
-    filter.userId = { $in: allowedDeviceIds };
+async function resolveTargetDeviceIds(params: {
+  req: AuthenticatedRequest;
+  body: Record<string, unknown>;
+  db: Db;
+  isServiceCall: boolean;
+  requesterUserId: string;
+}): Promise<{ deviceIds: string[]; errorMessage: string | null }> {
+  const { req, body, db, isServiceCall, requesterUserId } = params;
+  const queryDeviceId = readQueryValue(req.query.deviceId)?.trim() ?? '';
+  const envAgentDeviceId = (process.env.AGENT_DEVICE_ID || '').trim();
+  const bodyDeviceIds = parseDeviceIdList(body.deviceIds);
+  const bodyDeviceId = typeof body.deviceId === 'string' ? body.deviceId.trim() : '';
+
+  const explicitDeviceIds = dedupeDeviceIds([
+    ...bodyDeviceIds,
+    bodyDeviceId,
+    queryDeviceId,
+    envAgentDeviceId,
+  ].filter(Boolean));
+
+  const invalidExplicit = explicitDeviceIds.filter((deviceId) => !isValidDeviceId(deviceId));
+  if (invalidExplicit.length > 0) {
+    return {
+      deviceIds: [],
+      errorMessage: `Invalid deviceId format: ${invalidExplicit.join(', ')}`,
+    };
   }
 
-  const latest = await db
-    .collection<TelemetryDocument>('telemetry')
-    .find(filter)
-    .sort({ timestamp: -1 })
-    .limit(1)
-    .next();
+  const enforceAllowList = parseBooleanFlag(
+    process.env.AGENT_CONTROL_ENFORCE_ALLOWED_DEVICE_IDS,
+    false,
+  );
+  const allowedFromEnv = parseAllowedDeviceIdsFromEnv();
 
-  if (!latest || !DEVICE_ID_REGEX.test(latest.userId)) {
-    return null;
+  if (!isServiceCall) {
+    if (!isValidDeviceId(requesterUserId)) {
+      return {
+        deviceIds: [],
+        errorMessage: 'Authenticated user cannot be mapped to a valid deviceId.',
+      };
+    }
+
+    if (explicitDeviceIds.length > 0) {
+      const forbidden = explicitDeviceIds.filter((deviceId) => deviceId !== requesterUserId);
+      if (forbidden.length > 0) {
+        return {
+          deviceIds: [],
+          errorMessage: 'You do not have permission to run control cycle for requested deviceId.',
+        };
+      }
+      return { deviceIds: [requesterUserId], errorMessage: null };
+    }
+
+    return { deviceIds: [requesterUserId], errorMessage: null };
   }
 
-  return latest.userId;
+  if (explicitDeviceIds.length > 0) {
+    if (enforceAllowList && allowedFromEnv.length > 0) {
+      const filtered = explicitDeviceIds.filter((deviceId) => allowedFromEnv.includes(deviceId));
+      if (filtered.length === 0) {
+        return {
+          deviceIds: [],
+          errorMessage: 'Requested deviceId is not permitted by ALLOWED_DEVICE_IDS.',
+        };
+      }
+      return { deviceIds: filtered, errorMessage: null };
+    }
+
+    return { deviceIds: explicitDeviceIds, errorMessage: null };
+  }
+
+  if (enforceAllowList && allowedFromEnv.length === 0) {
+    return {
+      deviceIds: [],
+      errorMessage:
+        'AGENT_CONTROL_ENFORCE_ALLOWED_DEVICE_IDS is enabled but ALLOWED_DEVICE_IDS is empty or invalid.',
+    };
+  }
+
+  const maxDevices = clamp(
+    parsePositiveInteger(process.env.AGENT_CONTROL_MAX_DEVICES, DEFAULT_AGENT_CONTROL_MAX_DEVICES),
+    1,
+    MAX_AGENT_CONTROL_MAX_DEVICES,
+  );
+  const autoDetected = await listTelemetryDeviceIds(
+    db,
+    maxDevices,
+    enforceAllowList ? allowedFromEnv : null,
+  );
+  if (autoDetected.length === 0) {
+    return {
+      deviceIds: [],
+      errorMessage: 'No telemetry-backed device found for automatic agent control cycle.',
+    };
+  }
+
+  return { deviceIds: autoDetected, errorMessage: null };
 }
 
 function buildAdaptiveThresholds(params: {
@@ -614,89 +730,54 @@ async function persistDangerAlert(params: {
   await params.db.collection<DeviceAlertDocument>('device_alerts').insertOne(document);
 }
 
-async function runControlCycle(req: AuthenticatedRequest, res: VercelResponse): Promise<void> {
-  const body = parseBodyObject(req.body);
-  const { db } = await connectToDatabase();
-  const allowedFromEnv = parseAllowedDeviceIdsFromEnv();
-  let { deviceId, errorMessage } = resolveTargetDeviceId(req, body);
-
-  if (!deviceId) {
-    const inferredDeviceId = await resolveLatestTelemetryDeviceId(db, allowedFromEnv);
-    if (inferredDeviceId) {
-      deviceId = inferredDeviceId;
-    } else {
-      res.status(400).json({
-        error:
-          errorMessage ||
-          'Unable to resolve target deviceId. Provide deviceId in body/query, configure AGENT_DEVICE_ID/DEVICE_ID, or ensure telemetry exists for auto-inference.',
-      });
-      return;
-    }
-  }
-
-  const isServiceCall = typeof req.headers['x-api-key'] === 'string';
-  const requesterUserId = req.user.userId;
-  if (!isServiceCall && requesterUserId !== deviceId) {
-    res.status(403).json({
-      error: 'Forbidden',
-      message: 'You do not have permission to run control cycle for this device.',
-    });
-    return;
-  }
-
-  const effectiveUserId = requesterUserId === 'service-account' ? deviceId : requesterUserId;
-  const recentWindowSize = clamp(
-    parsePositiveInteger(process.env.AGENT_CONTROL_RECENT_WINDOW_SIZE, DEFAULT_RECENT_WINDOW_SIZE),
-    1,
-    MAX_RECENT_WINDOW_SIZE,
-  );
-  const mistSafetyLockEnabled = parseBooleanFlag(
-    process.env.AGENT_MIST_SAFETY_LOCK_ENABLED || process.env.MIST_SAFETY_LOCK_ENABLED,
-    DEFAULT_MIST_SAFETY_LOCK_ENABLED,
-  );
-  const emergencyReleaseDelayMs = clamp(
-    parsePositiveInteger(
-      process.env.AGENT_EMERGENCY_RELEASE_DELAY_MS,
-      DEFAULT_EMERGENCY_RELEASE_DELAY_MS,
-    ),
-    0,
-    30_000,
-  );
-
-  const telemetryCollection = db.collection<TelemetryDocument>('telemetry');
+async function runControlCycleForDevice(params: {
+  db: Db;
+  deviceId: string;
+  effectiveUserId: string;
+  recentWindowSize: number;
+  mistSafetyLockEnabled: boolean;
+  emergencyReleaseDelayMs: number;
+  trigger: string;
+  source: string;
+}): Promise<DeviceControlResult> {
+  const telemetryCollection = params.db.collection<TelemetryDocument>('telemetry');
   const latest = await telemetryCollection
-    .find({ userId: deviceId })
+    .find({ userId: params.deviceId })
     .sort({ timestamp: -1 })
     .limit(1)
     .next();
 
   if (!latest) {
     await insertDiagnosticLog({
-      deviceId,
-      userId: effectiveUserId,
+      deviceId: params.deviceId,
+      userId: params.effectiveUserId,
       source: 'ai-agent',
       category: 'AI',
       status: 'FAIL',
       message: '[FAIL] Agent control cycle aborted: no telemetry found.',
       metadata: {
-        trigger: 'agent-control-cycle',
-        recentWindowSize,
+        trigger: params.trigger,
+        source: params.source,
+        recentWindowSize: params.recentWindowSize,
       },
     });
 
-    res.status(404).json({
-      error: 'No telemetry found for this device.',
-      deviceId,
-    });
-    return;
+    return {
+      status: 404,
+      payload: {
+        success: false,
+        error: 'No telemetry found for this device.',
+        deviceId: params.deviceId,
+      },
+    };
   }
 
   const recent = await telemetryCollection
-    .find({ userId: deviceId })
+    .find({ userId: params.deviceId })
     .sort({ timestamp: -1 })
-    .limit(recentWindowSize)
+    .limit(params.recentWindowSize)
     .toArray();
-  const csvContext = await loadCsvContext(deviceId);
+  const csvContext = await loadCsvContext(params.deviceId);
 
   const dangerReasons = detectDangerReasons(latest);
   const dangerState = dangerReasons.length > 0;
@@ -705,7 +786,7 @@ async function runControlCycle(req: AuthenticatedRequest, res: VercelResponse): 
     recent,
     csvContext,
   });
-  const desiredDevices = buildDesiredDevices(latest, thresholds, mistSafetyLockEnabled);
+  const desiredDevices = buildDesiredDevices(latest, thresholds, params.mistSafetyLockEnabled);
   const devicePatch = diffRelayPatch(desiredDevices, latest.relays);
   const hasDevicePatch = Object.keys(devicePatch).length > 0;
 
@@ -745,18 +826,18 @@ async function runControlCycle(req: AuthenticatedRequest, res: VercelResponse): 
         index > 0 &&
         commandsToSend[index - 1]?.user_override === true &&
         command.user_override === false;
-      if (isReleasingOverride && emergencyReleaseDelayMs > 0) {
-        await new Promise((resolve) => setTimeout(resolve, emergencyReleaseDelayMs));
+      if (isReleasingOverride && params.emergencyReleaseDelayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, params.emergencyReleaseDelayMs));
       }
 
       const result = await publishAndAuditCommand({
-        deviceId,
-        userId: effectiveUserId,
+        deviceId: params.deviceId,
+        userId: params.effectiveUserId,
         command,
         reason,
         metadata: {
-          trigger: body.trigger || 'api',
-          source: body.source || 'agent-control-cycle',
+          trigger: params.trigger,
+          source: params.source,
           commandIndex: index + 1,
           totalCommands: commandsToSend.length,
           dangerState,
@@ -766,34 +847,38 @@ async function runControlCycle(req: AuthenticatedRequest, res: VercelResponse): 
     }
   } catch (error: unknown) {
     await insertDiagnosticLog({
-      deviceId,
-      userId: effectiveUserId,
+      deviceId: params.deviceId,
+      userId: params.effectiveUserId,
       source: 'ai-agent',
       category: 'AI',
       status: 'FAIL',
       message: '[FAIL] Agent control cycle failed to publish command.',
       metadata: {
-        trigger: 'agent-control-cycle',
+        trigger: params.trigger,
+        source: params.source,
         reason,
         error: error instanceof Error ? error.message : 'unknown error',
       },
     });
 
-    res.status(502).json({
-      error: 'Failed to publish control command.',
-      deviceId,
-      reason,
-      dangerState,
-    });
-    return;
+    return {
+      status: 502,
+      payload: {
+        success: false,
+        error: 'Failed to publish control command.',
+        deviceId: params.deviceId,
+        reason,
+        dangerState,
+      },
+    };
   }
 
   if (dangerState) {
     try {
       await persistDangerAlert({
-        db,
-        deviceId,
-        userId: effectiveUserId,
+        db: params.db,
+        deviceId: params.deviceId,
+        userId: params.effectiveUserId,
         telemetry: latest,
         reason,
         dangerReasons,
@@ -802,14 +887,15 @@ async function runControlCycle(req: AuthenticatedRequest, res: VercelResponse): 
       });
     } catch (error: unknown) {
       await insertDiagnosticLog({
-        deviceId,
-        userId: effectiveUserId,
+        deviceId: params.deviceId,
+        userId: params.effectiveUserId,
         source: 'ai-agent',
         category: 'AI',
         status: 'INFO',
         message: '[INFO] Danger state detected but alert persistence failed.',
         metadata: {
-          trigger: 'agent-control-cycle',
+          trigger: params.trigger,
+          source: params.source,
           error: error instanceof Error ? error.message : 'unknown error',
         },
       });
@@ -817,14 +903,15 @@ async function runControlCycle(req: AuthenticatedRequest, res: VercelResponse): 
   }
 
   await insertDiagnosticLog({
-    deviceId,
-    userId: effectiveUserId,
+    deviceId: params.deviceId,
+    userId: params.effectiveUserId,
     source: 'ai-agent',
     category: 'AI',
     status: 'PASS',
     message: `[PASS] Agent control cycle completed (${dangerState ? 'danger' : 'safe'} state).`,
     metadata: {
-      trigger: 'agent-control-cycle',
+      trigger: params.trigger,
+      source: params.source,
       reason,
       dangerReasons,
       commandCount: commandResults.length,
@@ -834,24 +921,134 @@ async function runControlCycle(req: AuthenticatedRequest, res: VercelResponse): 
     },
   });
 
-  res.status(200).json({
-    success: true,
-    deviceId,
-    dangerState,
-    dangerReasons,
-    reason,
-    thresholds,
-    desiredDevices: devicePatch,
-    commandCount: commandResults.length,
-    commands: commandResults,
-    csvContext: {
-      csvPath: csvContext.csvPath,
-      csvAvailable: csvContext.csvAvailable,
-      rowsConsidered: csvContext.rowsConsidered,
-      temperatureAvg: csvContext.temperatureAvg,
-      humidityAvg: csvContext.humidityAvg,
-      luxAvg: csvContext.luxAvg,
+  return {
+    status: 200,
+    payload: {
+      success: true,
+      deviceId: params.deviceId,
+      dangerState,
+      dangerReasons,
+      reason,
+      thresholds,
+      desiredDevices: devicePatch,
+      commandCount: commandResults.length,
+      commands: commandResults,
+      csvContext: {
+        csvPath: csvContext.csvPath,
+        csvAvailable: csvContext.csvAvailable,
+        rowsConsidered: csvContext.rowsConsidered,
+        temperatureAvg: csvContext.temperatureAvg,
+        humidityAvg: csvContext.humidityAvg,
+        luxAvg: csvContext.luxAvg,
+      },
     },
+  };
+}
+
+async function runControlCycle(req: AuthenticatedRequest, res: VercelResponse): Promise<void> {
+  const body = parseBodyObject(req.body);
+  const { db } = await connectToDatabase();
+  const apiKeyHeader = req.headers['x-api-key'];
+  const isServiceCall =
+    (typeof apiKeyHeader === 'string' && apiKeyHeader.trim().length > 0) ||
+    (Array.isArray(apiKeyHeader) && apiKeyHeader.length > 0);
+  const requesterUserId = req.user.userId;
+
+  const { deviceIds, errorMessage } = await resolveTargetDeviceIds({
+    req,
+    body,
+    db,
+    isServiceCall,
+    requesterUserId,
+  });
+  if (deviceIds.length === 0) {
+    res.status(400).json({
+      error: errorMessage || 'Unable to resolve target deviceId(s).',
+    });
+    return;
+  }
+
+  const recentWindowSize = clamp(
+    parsePositiveInteger(process.env.AGENT_CONTROL_RECENT_WINDOW_SIZE, DEFAULT_RECENT_WINDOW_SIZE),
+    1,
+    MAX_RECENT_WINDOW_SIZE,
+  );
+  const mistSafetyLockEnabled = parseBooleanFlag(
+    process.env.AGENT_MIST_SAFETY_LOCK_ENABLED || process.env.MIST_SAFETY_LOCK_ENABLED,
+    DEFAULT_MIST_SAFETY_LOCK_ENABLED,
+  );
+  const emergencyReleaseDelayMs = clamp(
+    parsePositiveInteger(
+      process.env.AGENT_EMERGENCY_RELEASE_DELAY_MS,
+      DEFAULT_EMERGENCY_RELEASE_DELAY_MS,
+    ),
+    0,
+    30_000,
+  );
+
+  const trigger =
+    typeof body.trigger === 'string' && body.trigger.trim().length > 0
+      ? body.trigger.trim()
+      : 'api';
+  const source =
+    typeof body.source === 'string' && body.source.trim().length > 0
+      ? body.source.trim()
+      : 'agent-control-cycle';
+
+  if (deviceIds.length === 1) {
+    const singleDeviceId = deviceIds[0];
+    const singleResult = await runControlCycleForDevice({
+      db,
+      deviceId: singleDeviceId,
+      effectiveUserId: isServiceCall ? singleDeviceId : requesterUserId,
+      recentWindowSize,
+      mistSafetyLockEnabled,
+      emergencyReleaseDelayMs,
+      trigger,
+      source,
+    });
+    res.status(singleResult.status).json(singleResult.payload);
+    return;
+  }
+
+  const results: Array<Record<string, unknown>> = [];
+  let successCount = 0;
+
+  for (const deviceId of deviceIds) {
+    const result = await runControlCycleForDevice({
+      db,
+      deviceId,
+      effectiveUserId: isServiceCall ? deviceId : requesterUserId,
+      recentWindowSize,
+      mistSafetyLockEnabled,
+      emergencyReleaseDelayMs,
+      trigger,
+      source,
+    });
+    const isSuccess = result.status >= 200 && result.status < 300 && result.payload.success === true;
+    if (isSuccess) {
+      successCount += 1;
+    }
+
+    results.push({
+      deviceId,
+      status: result.status,
+      ...result.payload,
+    });
+  }
+
+  const failCount = results.length - successCount;
+  const statusCode = failCount === 0 ? 200 : successCount > 0 ? 207 : 502;
+
+  res.status(statusCode).json({
+    success: failCount === 0,
+    scope: 'multi-device',
+    requestedDeviceCount: deviceIds.length,
+    successCount,
+    failCount,
+    trigger,
+    source,
+    results,
   });
 }
 

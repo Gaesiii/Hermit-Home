@@ -20,7 +20,6 @@ Use the repository root [render.yaml](../render.yaml) to provision services on R
 
 Shared integration values:
 
-- `DEVICE_ID` (Mongo ObjectId for the terrarium)
 - `SERVICE_API_KEY` (must match API secret on Vercel)
 - `MONGODB_URI`
 - `MONGODB_DB_NAME`
@@ -28,6 +27,7 @@ Shared integration values:
 AI agent values:
 
 - `API_BASE_URL` (your Vercel API base URL)
+- `DEVICE_ID` (Mongo ObjectId for the terrarium when running dedicated ai-agent worker)
 - `GEMINI_API_KEY`
 - Optional tuning:
   - `CONTROL_INTERVAL_SECONDS`
@@ -53,6 +53,12 @@ Temporary bridge values (mqtt-worker -> Vercel trigger endpoint):
 - `AGENT_CONTROL_INTERVAL_MS=20000`
 - `AGENT_CONTROL_TIMEOUT_MS=8000`
 - `AGENT_CONTROL_BODY_JSON={"source":"mqtt-worker","trigger":"interval"}`
+
+Vercel API values for multi-device agent cycle:
+
+- `AGENT_DEVICE_ID` must be empty (avoid single-device lock)
+- `AGENT_CONTROL_MAX_DEVICES=30` (or your preferred cap)
+- `AGENT_CONTROL_ENFORCE_ALLOWED_DEVICE_IDS=false` (set `true` only when you intentionally restrict by `ALLOWED_DEVICE_IDS`)
 
 ## CSV Context Notes
 
