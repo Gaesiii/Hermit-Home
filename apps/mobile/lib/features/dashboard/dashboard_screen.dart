@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'dart:math';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/services/auth_service.dart';
@@ -37,7 +38,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   // --- BIẾN STATE CHO TAB HỒ SƠ ---
   String _userIdDisplay = "Loading...";
-  String _userName = "User";
+  String _userName = "Đang tải...";
 
   // --- BIẾN STATE CHO TAB LỊCH SỬ ---
   double? _currentTemp;
@@ -150,16 +151,41 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
   }
 
+  String? _extractUserNameFromToken(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return null;
+
+      String payload = parts[1];
+      while (payload.length % 4 != 0) {
+        payload += '=';
+      }
+
+      final decodedPayload = utf8.decode(base64Url.decode(payload));
+      final payloadMap = jsonDecode(decodedPayload);
+      if (payloadMap is! Map<String, dynamic>) return null;
+
+      final emailRaw = payloadMap['email'];
+      if (emailRaw is! String) return null;
+
+      final email = emailRaw.trim();
+      if (email.isEmpty) return null;
+      return email.split('@').first.trim();
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _loadUserProfile() async {
     try {
       final token = await _authService.getToken();
       final storedUserId = (await _authService.getUserId())?.trim();
       final tokenUserId = token == null ? null : _extractUserIdFromToken(token);
+      final tokenUserName =
+          token == null ? null : _extractUserNameFromToken(token);
       String? telemetryUserId;
 
-      if (token != null &&
-          storedUserId != null &&
-          storedUserId.isNotEmpty) {
+      if (token != null && storedUserId != null && storedUserId.isNotEmpty) {
         try {
           final telemetryUrl = Uri.parse(
             '${AppConstants.apiBaseUrl}/api/devices/$storedUserId/telemetry?limit=1',
@@ -189,23 +215,24 @@ class _DashboardScreenState extends State<DashboardScreen>
         }
       }
 
-      final resolvedUserId = (telemetryUserId != null && telemetryUserId.isNotEmpty)
-          ? telemetryUserId
-          : (storedUserId != null && storedUserId.isNotEmpty)
-              ? storedUserId
-              : tokenUserId;
+      final resolvedUserId =
+          (telemetryUserId != null && telemetryUserId.isNotEmpty)
+              ? telemetryUserId
+              : (storedUserId != null && storedUserId.isNotEmpty)
+                  ? storedUserId
+                  : tokenUserId;
 
       if (!mounted) return;
 
       setState(() {
         if (resolvedUserId != null && resolvedUserId.isNotEmpty) {
           _userIdDisplay = resolvedUserId;
-          _userName = resolvedUserId.length >= 6
-              ? resolvedUserId.substring(0, 6)
-              : resolvedUserId;
         } else {
           _userIdDisplay = 'User ID unavailable';
-          _userName = 'User';
+        }
+
+        if (tokenUserName != null && tokenUserName.isNotEmpty) {
+          _userName = tokenUserName;
         }
       });
     } catch (e) {
@@ -213,7 +240,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       if (mounted) {
         setState(() {
           _userIdDisplay = 'User ID unavailable';
-          _userName = 'User';
         });
       }
     }
@@ -240,6 +266,25 @@ class _DashboardScreenState extends State<DashboardScreen>
     await _authService.logout();
     if (!mounted) return;
     Navigator.pushReplacementNamed(context, '/login');
+  }
+
+  Future<void> _copyUserId() async {
+    final value = _userIdDisplay.trim();
+    if (value.isEmpty ||
+        value == 'Loading...' ||
+        value == 'User ID unavailable') {
+      return;
+    }
+
+    await Clipboard.setData(ClipboardData(text: value));
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Đã copy User ID'),
+        duration: Duration(milliseconds: 900),
+      ),
+    );
   }
 
   Future<void> _syncDataFromDatabase({bool resetPagination = false}) async {
@@ -1134,11 +1179,28 @@ class _DashboardScreenState extends State<DashboardScreen>
                               fontWeight: FontWeight.bold)),
                     ),
                     const SizedBox(height: 5),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text('User ID: $_userIdDisplay',
-                          style: TextStyle(
-                              color: textMain.withOpacity(0.7), fontSize: 14)),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Flexible(
+                          child: Text('User ID: $_userIdDisplay',
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  color: textMain.withOpacity(0.7),
+                                  fontSize: 14)),
+                        ),
+                        IconButton(
+                          onPressed: _copyUserId,
+                          tooltip: 'Copy User ID',
+                          icon: Icon(
+                            Icons.copy_rounded,
+                            size: 18,
+                            color: textMain.withOpacity(0.75),
+                          ),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 30),
                     Container(height: 1, color: textMain.withOpacity(0.2)),
