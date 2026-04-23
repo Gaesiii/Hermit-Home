@@ -95,7 +95,13 @@ services:
         value: "2"
       - key: USER_OVERRIDE_TAKEOVER_DELAY_SECONDS
         value: "20"
-      - key: GEMINI_API_KEY
+      - key: OPENROUTER_API_KEY
         sync: false
-      - key: GEMINI_MODEL
-        value: "gemini-2.5-flash"
+      - key: OPENROUTER_MODEL
+        value: "google/gemma-3-27b-it:free"
+      - key: OPENROUTER_BASE_URL
+        value: "https://openrouter.ai/api/v1"
+      - key: OPENROUTER_HTTP_REFERER
+        sync: false
+      - key: OPENROUTER_APP_NAME
+        value: "Hermit Home AI Agent"

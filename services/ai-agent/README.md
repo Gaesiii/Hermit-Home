@@ -5,7 +5,7 @@ This service implements Tier-2 control for the terrarium:
 1. Pulls live telemetry from the API.
 2. Pulls recent telemetry history from API.
 3. Loads historical CSV context (`TELEMETRY_CSV_PATH`).
-4. Uses Gemini + deterministic safety checks to validate control decisions against hermit-crab safe ranges:
+4. Uses OpenRouter LLM + deterministic safety checks to validate control decisions against hermit-crab safe ranges:
    - Temperature: `24C - 29C`
    - Humidity: `70% - 85%`
    - Lux: `200 - 500`
@@ -24,11 +24,14 @@ Required:
 - `API_BASE_URL`
 - `DEVICE_ID`
 - `SERVICE_API_KEY`
-- `GEMINI_API_KEY`
+- `OPENROUTER_API_KEY`
 
 Optional:
 
-- `GEMINI_MODEL` (default: `gemini-2.5-flash`)
+- `OPENROUTER_MODEL` (default: `google/gemma-3-27b-it:free`)
+- `OPENROUTER_BASE_URL` (default: `https://openrouter.ai/api/v1`)
+- `OPENROUTER_HTTP_REFERER` (optional)
+- `OPENROUTER_APP_NAME` (default: `Hermit Home AI Agent`)
 - `HTTP_TIMEOUT_SECONDS` (default: `10`)
 - `CONTROL_INTERVAL_SECONDS` (default: `30`)
 - `TELEMETRY_WINDOW_SIZE` (default: `12`)
@@ -60,7 +63,7 @@ Deployment flow:
 2. In Render, create Blueprint from this repo (it will read `render.yaml`).
 3. Fill secret env values in Render:
    - `API_BASE_URL` should point to your Vercel API domain.
-   - `DEVICE_ID`, `SERVICE_API_KEY`, `GEMINI_API_KEY`
+   - `DEVICE_ID`, `SERVICE_API_KEY`, `OPENROUTER_API_KEY`
    - MQTT + MongoDB credentials for `mqtt-worker`
 4. Ensure CSV path is valid for worker runtime:
    - default: `../../exports/telemetry-export.csv` (relative to `services/ai-agent`)

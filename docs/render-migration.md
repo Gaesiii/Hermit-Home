@@ -28,7 +28,8 @@ AI agent values:
 
 - `API_BASE_URL` (your Vercel API base URL)
 - `DEVICE_ID` (Mongo ObjectId for the terrarium when running dedicated ai-agent worker)
-- `GEMINI_API_KEY`
+- `OPENROUTER_API_KEY`
+- `OPENROUTER_MODEL` (recommended: `google/gemma-3-27b-it:free`)
 - Optional tuning:
   - `CONTROL_INTERVAL_SECONDS`
   - `TELEMETRY_WINDOW_SIZE`
