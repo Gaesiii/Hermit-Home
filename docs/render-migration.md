@@ -58,6 +58,7 @@ Vercel API values for multi-device agent cycle:
 
 - `AGENT_CONTROL_MAX_DEVICES=30` (or your preferred cap)
 - `AGENT_CONTROL_ACTIVE_WINDOW_SECONDS=900` (only control devices with recent telemetry)
+- `USER_OVERRIDE_GRACE_SECONDS=300` (user command keeps control for 5 minutes when safe)
 - `AGENT_CONTROL_ENFORCE_ALLOWED_DEVICE_IDS=false` (set `true` only when you intentionally restrict by `ALLOWED_DEVICE_IDS`)
 
 ## CSV Context Notes

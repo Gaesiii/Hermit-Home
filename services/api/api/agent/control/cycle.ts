@@ -9,6 +9,10 @@ import { publishCommand } from '../../../lib/mqttPublisher';
 import { sanitizeCommandPayload } from '../../../lib/mistSafety';
 import { handleApiPreflight, methodNotAllowed } from '../../../lib/http';
 import { insertCommandPendingLogs, insertDiagnosticLog } from '../../../lib/diagnosticLogRepo';
+import {
+  clearUserOverrideWindow,
+  getActiveUserOverrideWindow,
+} from '../../../lib/userOverrideWindowRepo';
 
 const ALLOWED_METHODS = ['POST'] as const;
 const DEVICE_ID_REGEX = /^[a-f\d]{24}$/i;
@@ -728,6 +732,9 @@ async function persistDangerAlert(params: {
   dangerReasons: string[];
   thresholds: ThresholdConfig;
   desiredDevices: Partial<RelayState>;
+  userOverrideWindowActive: boolean;
+  userOverrideTakenOver: boolean;
+  userOverrideWindowExpiresAt: Date | null;
 }): Promise<void> {
   const alertEnabled = parseBooleanFlag(process.env.AGENT_CONTROL_ALERTS_ENABLED, true);
   if (!alertEnabled) return;
@@ -756,6 +763,9 @@ async function persistDangerAlert(params: {
       desired_devices: params.desiredDevices,
       thresholds: params.thresholds,
       trigger: 'agent-control-cycle',
+      user_override_window_active: params.userOverrideWindowActive,
+      user_override_taken_over: params.userOverrideTakenOver,
+      user_override_expires_at: params.userOverrideWindowExpiresAt,
     },
     createdAt: new Date(),
   };
@@ -822,12 +832,42 @@ async function runControlCycleForDevice(params: {
   const desiredDevices = buildDesiredDevices(latest, thresholds, params.mistSafetyLockEnabled);
   const devicePatch = diffRelayPatch(desiredDevices, latest.relays);
   const hasDevicePatch = Object.keys(devicePatch).length > 0;
+  const activeUserOverrideWindow = await getActiveUserOverrideWindow(params.deviceId);
+  const userOverrideWindowActive = activeUserOverrideWindow !== null;
+  const userOverrideWindowExpiresAt = activeUserOverrideWindow?.expiresAt ?? null;
 
   const commandsToSend: CommandPayload[] = [];
   let reason = 'Environment is within adaptive operating range.';
+  let userOverrideTakenOver = false;
+
+  const clearWindowSafely = async (clearReason: string): Promise<void> => {
+    try {
+      await clearUserOverrideWindow(params.deviceId, clearReason);
+    } catch (error: unknown) {
+      await insertDiagnosticLog({
+        deviceId: params.deviceId,
+        userId: params.effectiveUserId,
+        source: 'ai-agent',
+        category: 'AI',
+        status: 'INFO',
+        message: '[INFO] Failed to update user override grace state in database.',
+        metadata: {
+          trigger: params.trigger,
+          source: params.source,
+          clearReason,
+          error: error instanceof Error ? error.message : 'unknown error',
+        },
+      });
+    }
+  };
 
   if (dangerState) {
     reason = `Danger state detected: ${dangerReasons.join(' ')}`;
+    if (userOverrideWindowActive) {
+      userOverrideTakenOver = true;
+      reason += ' Agent reclaimed control from active user override window.';
+      await clearWindowSafely('danger-threshold-exceeded');
+    }
 
     if (hasDevicePatch) {
       commandsToSend.push({
@@ -840,14 +880,25 @@ async function runControlCycleForDevice(params: {
       user_override: false,
       thresholds,
     });
-  } else if (!latest.user_override && hasDevicePatch) {
+  } else if (userOverrideWindowActive) {
+    reason = `User override grace active until ${userOverrideWindowExpiresAt?.toISOString() || 'unknown'}; skipping automated relay command.`;
+  } else if (latest.user_override) {
+    reason = 'User override grace expired; returning control to agent automation.';
+    await clearWindowSafely('grace-expired-agent-reclaim');
+    const reclaimCommand: CommandPayload = {
+      user_override: false,
+      thresholds,
+    };
+    if (hasDevicePatch) {
+      reclaimCommand.devices = devicePatch;
+    }
+    commandsToSend.push(reclaimCommand);
+  } else if (hasDevicePatch) {
     reason = 'Adjusting relays toward adaptive safe thresholds.';
     commandsToSend.push({
       user_override: false,
       devices: devicePatch,
     });
-  } else if (latest.user_override) {
-    reason = 'User override is active and no danger state is present; skipping automated relay command.';
   }
 
   const commandResults: Array<Record<string, unknown>> = [];
@@ -917,6 +968,9 @@ async function runControlCycleForDevice(params: {
         dangerReasons,
         thresholds,
         desiredDevices: devicePatch,
+        userOverrideWindowActive,
+        userOverrideTakenOver,
+        userOverrideWindowExpiresAt,
       });
     } catch (error: unknown) {
       await insertDiagnosticLog({
@@ -948,6 +1002,9 @@ async function runControlCycleForDevice(params: {
       reason,
       dangerReasons,
       commandCount: commandResults.length,
+      userOverrideWindowActive,
+      userOverrideTakenOver,
+      userOverrideWindowExpiresAt,
       csvAvailable: csvContext.csvAvailable,
       csvRowsConsidered: csvContext.rowsConsidered,
       thresholds,
@@ -964,6 +1021,9 @@ async function runControlCycleForDevice(params: {
       reason,
       thresholds,
       desiredDevices: devicePatch,
+      userOverrideWindowActive,
+      userOverrideWindowExpiresAt,
+      userOverrideTakenOver,
       commandCount: commandResults.length,
       commands: commandResults,
       csvContext: {

@@ -19,6 +19,10 @@ import {
 import { handleApiPreflight, methodNotAllowed } from '../../../lib/http';
 import { toUtc7Iso } from '../../../lib/timezone';
 import { insertCommandPendingLogs, insertDiagnosticLog } from '../../../lib/diagnosticLogRepo';
+import {
+  clearUserOverrideWindow,
+  startUserOverrideWindow,
+} from '../../../lib/userOverrideWindowRepo';
 
 const OBJECT_ID_REGEX = /^[a-f\d]{24}$/i;
 const ALLOWED_METHODS = ['GET', 'POST'] as const;
@@ -141,6 +145,14 @@ function parseAlertLimit(rawLimit: unknown): number | null {
   return parsed;
 }
 
+function isServiceRequest(req: AuthenticatedRequest): boolean {
+  const apiKeyHeader = req.headers['x-api-key'];
+  return (
+    (typeof apiKeyHeader === 'string' && apiKeyHeader.trim().length > 0) ||
+    (Array.isArray(apiKeyHeader) && apiKeyHeader.length > 0)
+  );
+}
+
 function resolveAuthorizedDeviceId(
   req: AuthenticatedRequest,
   res: VercelResponse,
@@ -242,6 +254,13 @@ async function handleControlGet(
       _id: entry._id?.toString?.() ?? entry._id,
       createdAt: toUtc7Iso(entry.createdAt) ?? entry.createdAt,
     }));
+    const { db } = await connectToDatabase();
+    const latestDangerAlert = await db
+      .collection<DeviceAlertDocument>('device_alerts')
+      .find({ deviceId, danger_state: true })
+      .sort({ createdAt: -1 })
+      .limit(1)
+      .next();
 
     await insertDiagnosticLog({
       deviceId,
@@ -258,7 +277,11 @@ async function handleControlGet(
       },
     });
 
-    res.status(200).json({ deviceId, history: normalizedHistory });
+    res.status(200).json({
+      deviceId,
+      history: normalizedHistory,
+      latestDangerAlert: latestDangerAlert ? normalizeAlertDoc(latestDangerAlert) : null,
+    });
   } catch (error: unknown) {
     console.error('[GET /api/devices/[deviceId]/action?type=control]', error);
     await insertDiagnosticLog({
@@ -323,10 +346,12 @@ async function handleControlPost(
 
   const requestedMistOn = stateUpdate.mist === true;
   const safeStateUpdate = sanitizeRelayMap(stateUpdate);
+  const isServiceCall = isServiceRequest(req);
   const commandPayload: CommandPayload = {
     user_override: true,
     devices: safeStateUpdate,
   };
+  let overrideExpiresAtIso: string | null = null;
 
   try {
     await publishCommand(deviceId, commandPayload);
@@ -341,6 +366,32 @@ async function handleControlPost(
         type: 'control',
       },
     });
+
+    if (!isServiceCall) {
+      try {
+        const window = await startUserOverrideWindow({
+          deviceId,
+          userId: req.user.userId,
+          activatedBy: 'control',
+        });
+        overrideExpiresAtIso = toUtc7Iso(window.expiresAt) ?? window.expiresAt.toISOString();
+      } catch (windowError: unknown) {
+        await insertDiagnosticLog({
+          deviceId,
+          userId: req.user.userId,
+          source: 'api',
+          category: 'COMMAND',
+          status: 'INFO',
+          message: '[INFO] User override grace window could not be persisted.',
+          metadata: {
+            endpoint: '/api/devices/[deviceId]/action',
+            method: 'POST',
+            type: 'control',
+            error: (windowError as Error).message,
+          },
+        });
+      }
+    }
   } catch (error: unknown) {
     console.error('[POST /api/devices/[deviceId]/action?type=control] MQTT publish failed', error);
     await insertDiagnosticLog({
@@ -372,6 +423,7 @@ async function handleControlPost(
       appliedState: safeStateUpdate,
       recordId,
       mist_locked_off: MIST_SAFETY_LOCK_ENABLED && requestedMistOn,
+      user_override_expires_at: overrideExpiresAtIso,
     });
   } catch (error: unknown) {
     console.error('[POST /api/devices/[deviceId]/action?type=control] MongoDB insert failed', error);
@@ -381,6 +433,7 @@ async function handleControlPost(
       appliedState: safeStateUpdate,
       warning: 'Command was sent to the device but could not be recorded in the database.',
       mist_locked_off: MIST_SAFETY_LOCK_ENABLED && requestedMistOn,
+      user_override_expires_at: overrideExpiresAtIso,
     });
   }
 }
@@ -405,7 +458,8 @@ async function handleOverridePost(
   const command = source as unknown as CommandPayload;
   const safeCommand = sanitizeCommandPayload(command);
   const requestedMistOn = command?.devices?.mist === true;
-  const isServiceCall = typeof req.headers['x-api-key'] === 'string';
+  const isServiceCall = isServiceRequest(req);
+  let overrideExpiresAtIso: string | null = null;
 
   try {
     await publishCommand(deviceId, safeCommand);
@@ -444,11 +498,43 @@ async function handleOverridePost(
       });
     }
 
+    if (!isServiceCall && safeCommand.user_override && safeCommand.devices) {
+      try {
+        const window = await startUserOverrideWindow({
+          deviceId,
+          userId: req.user.userId,
+          activatedBy: 'override',
+        });
+        overrideExpiresAtIso = toUtc7Iso(window.expiresAt) ?? window.expiresAt.toISOString();
+      } catch (windowError: unknown) {
+        await insertDiagnosticLog({
+          deviceId,
+          userId: req.user.userId,
+          source: 'api',
+          category: 'COMMAND',
+          status: 'INFO',
+          message: '[INFO] User override grace window could not be persisted.',
+          metadata: {
+            endpoint: '/api/devices/[deviceId]/action',
+            method: 'POST',
+            type: 'override',
+            byServiceKey: isServiceCall,
+            error: (windowError as Error).message,
+          },
+        });
+      }
+    }
+
+    if (safeCommand.user_override === false) {
+      await clearUserOverrideWindow(deviceId, isServiceCall ? 'agent-reclaimed-control' : 'user-release');
+    }
+
     res.status(200).json({
       success: true,
       device: deviceId,
       message: 'Override command sent',
       mist_locked_off: MIST_SAFETY_LOCK_ENABLED && requestedMistOn,
+      user_override_expires_at: overrideExpiresAtIso,
     });
   } catch (error: unknown) {
     console.error('[POST /api/devices/[deviceId]/action?type=override] MQTT publish failed', error);
