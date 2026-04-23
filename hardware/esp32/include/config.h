@@ -12,8 +12,9 @@
 #define LIGHT_SDA       20    // BH1750 I2C — SDA (GPIO20, không phải mặc định)
 #define LIGHT_SCL       19    // BH1750 I2C — SCL (GPIO19, không phải mặc định)
 
-// BOOT button (GPIO0): hold for 3 seconds to clear WiFi/user config.
+// BOOT button (GPIO0): hold for 3 seconds to factory-reset device settings.
 #define BOOT_PIN        0
+#define BOOT_HOLD_RESET_MS 3000UL
 
 // ----------------------------------------------------------------
 //  CHÂN RELAY (Actuator Pins)
@@ -47,12 +48,26 @@
 #define MQTT_USER       "admin"
 #define MQTT_PASS       "Admin1!@"
 #define MQTT_CLIENT_ID  "ESP32_Garden_Phuc_001"
+
+// IMPORTANT:
+// - MQTT_BROKER should be host only (no http:// or https://).
+// - Firmware now normalizes accidental URL input and can extract :port.
+// - NTP sync is required before TLS handshake on some brokers.
+#define NTP_SERVER_1            "pool.ntp.org"
+#define NTP_SERVER_2            "time.google.com"
+#define NTP_GMT_OFFSET_SEC      (7 * 3600)
+#define NTP_DAYLIGHT_OFFSET_SEC 0
+#define NTP_SYNC_TIMEOUT_MS     15000U
+#define NTP_MIN_VALID_EPOCH     1700000000UL
 // ----------------------------------------------------------------
 //  KHOẢNG THỜI GIAN VÒNG LẶP (Intervals — milliseconds)
 // ----------------------------------------------------------------
-#define INTERVAL_SENSOR_MS      1000U   // Vòng lặp đọc cảm biến: 1 giây
-#define INTERVAL_PUBLISH_MS    10000U   // Gửi telemetry lên MQTT:  10 giây
-#define INTERVAL_RECONNECT_MS   5000U   // Thử kết nối lại MQTT:    5 giây
+#define INTERVAL_SENSOR_MS      1000U   // Sensor/control loop every 1s
+#define INTERVAL_PUBLISH_MS    10000U   // Publish telemetry every 10s
+#define INTERVAL_RECONNECT_MS   5000U   // Retry MQTT reconnect every 5s
+// Delay before enabling ESP local hardcoded hysteresis when cloud
+// control is offline. Recommended range: 60000-180000 ms.
+#define LOCAL_FALLBACK_DELAY_MS 120000U
 
 // ----------------------------------------------------------------
 //  NGƯỠNG HYSTERESIS MẶC ĐỊNH (Default Threshold Defaults)

@@ -23,6 +23,8 @@ class AppConstants {
       '/api/devices/$deviceId/action?type=override';
   static String deviceControlEndpoint(String deviceId) =>
       '/api/devices/$deviceId/action?type=control';
+  static String deviceChatboxEndpoint(String deviceId) =>
+      '/api/devices/$deviceId/chatbox';
 
   static const String tokenKey = 'hh_jwt_token';
   static const String emailKey = 'hh_user_email';

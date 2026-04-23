@@ -86,6 +86,30 @@ class CommandPublisher:
                 logger.warning("Published emergency AI override command: %s", devices)
         return ok
 
+    def send_agent_device_control(
+        self,
+        devices: Dict[str, bool],
+        reason: Optional[str] = None,
+    ) -> bool:
+        if not devices:
+            return False
+
+        payload = {
+            "user_override": False,
+            "devices": devices,
+        }
+        ok = self._post_json(f"/api/devices/{self.device_id}/action?type=override", payload)
+        if ok:
+            if reason:
+                logger.info(
+                    "Published agent device control command: %s | reason=%s",
+                    devices,
+                    reason,
+                )
+            else:
+                logger.info("Published agent device control command: %s", devices)
+        return ok
+
     def run_emergency_sequence(
         self,
         devices: Dict[str, bool],

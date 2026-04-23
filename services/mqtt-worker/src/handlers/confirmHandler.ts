@@ -66,6 +66,12 @@ export async function handleConfirm(
       return;
     }
 
+    // Retained "online" status published by ESP32 right after reconnect.
+    if (parsed.status === 'online') {
+      logger.info({ deviceId }, 'ESP32 reported online status');
+      return;
+    }
+
     if (
       parsed.event !== 'override_ack' ||
       typeof parsed.device !== 'string' ||

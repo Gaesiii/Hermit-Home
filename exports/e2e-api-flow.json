@@ -1,0 +1,660 @@
+﻿{
+  "generatedAt": "2026-04-21T12:00:22.854+07:00",
+  "baseUrl": "https://hermit-home.vercel.app",
+  "deviceId": "67c6fd9a9acfdbc1d05c22b1",
+  "config": {
+    "timeoutMs": 15000,
+    "stabilityRounds": 20
+  },
+  "smoke": [
+    {
+      "step": "GET /api/devices",
+      "pass": true,
+      "expectedStatuses": [
+        200
+      ],
+      "status": 200,
+      "timeout": false,
+      "durationMs": 794.1878,
+      "body": {
+        "success": true,
+        "message": "Use /api/devices/{deviceId}/data?type=latest|history, /api/devices/{deviceId}/action?type=control|override|alert, /api/logs, or /api/devices/{deviceId}"
+      },
+      "error": null
+    },
+    {
+      "step": "GET /api/devices/schedules",
+      "pass": true,
+      "expectedStatuses": [
+        200
+      ],
+      "status": 200,
+      "timeout": false,
+      "durationMs": 652.0047000000001,
+      "body": {
+        "success": true,
+        "schedules": [],
+        "message": "Schedule API placeholder is active. No schedules configured yet."
+      },
+      "error": null
+    },
+    {
+      "step": "POST /api/users/register",
+      "pass": true,
+      "expectedStatuses": [
+        201
+      ],
+      "status": 201,
+      "timeout": false,
+      "durationMs": 3615.5841,
+      "body": {
+        "message": "Account created successfully.",
+        "user": {
+          "_id": "69e703e64e8a73f5f1bcd4ca",
+          "email": "flow-test-1776747489894-5f964a@example.com",
+          "createdAt": "2026-04-21T11:58:14.672+07:00"
+        }
+      },
+      "error": null
+    },
+    {
+      "step": "POST /api/users/login",
+      "pass": true,
+      "expectedStatuses": [
+        200
+      ],
+      "status": 200,
+      "timeout": false,
+      "durationMs": 865.4925000000003,
+      "body": {
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OWU3MDNlNjRlOGE3M2Y1ZjFiY2Q0Y2EiLCJlbWFpbCI6ImZsb3ctdGVzdC0xNzc2NzQ3NDg5ODk0LTVmOTY0YUBleGFtcGxlLmNvbSIsImlhdCI6MTc3Njc0NzQ5NSwiZXhwIjoxNzc3MzUyMjk1fQ.LKWB_62eQLow3tmj_T6tytbVozHhIaFBQ4r0mRWGqLE",
+        "user": {
+          "_id": "69e703e64e8a73f5f1bcd4ca",
+          "email": "flow-test-1776747489894-5f964a@example.com",
+          "createdAt": "2026-04-21T11:58:14.672+07:00"
+        }
+      },
+      "error": null
+    },
+    {
+      "step": "GET /api/devices/{deviceId}/status",
+      "pass": true,
+      "expectedStatuses": [
+        200
+      ],
+      "status": 200,
+      "timeout": false,
+      "durationMs": 2873.8899999999994,
+      "body": {
+        "_id": "69e004da2031eaac2df553eb",
+        "userId": "67c6fd9a9acfdbc1d05c22b1",
+        "timestamp": "2026-04-16T04:36:26.478+07:00",
+        "temperature": 30.2,
+        "humidity": 70.6,
+        "lux": 0,
+        "sensor_fault": false,
+        "user_override": false,
+        "relays": {
+          "heater": false,
+          "mist": false,
+          "fan": true,
+          "light": true
+        }
+      },
+      "error": null
+    },
+    {
+      "step": "GET /api/devices/{deviceId}/telemetry",
+      "pass": true,
+      "expectedStatuses": [
+        200
+      ],
+      "status": 200,
+      "timeout": false,
+      "durationMs": 694.4665999999997,
+      "body": {
+        "deviceId": "67c6fd9a9acfdbc1d05c22b1",
+        "count": 10,
+        "telemetry": [
+          {
+            "id": "69e004da2031eaac2df553eb",
+            "userId": "67c6fd9a9acfdbc1d05c22b1",
+            "timestamp": "2026-04-16T04:36:26.478+07:00",
+            "temperature": 30.2,
+            "humidity": 70.6,
+            "lux": 0,
+            "sensor_fault": false,
+            "user_override": false,
+            "relays": {
+              "heater": false,
+              "mist": false,
+              "fan": true,
+              "light": true
+            }
+          },
+          {
+            "id": "69df90a22031eaac2df54bf1",
+            "userId": "67c6fd9a9acfdbc1d05c22b1",
+            "timestamp": "2026-04-15T20:20:34.091+07:00",
+            "temperature": 30.2,
+            "humidity": 70.6,
+            "lux": 0,
+            "sensor_fault": false,
+            "user_override": false,
+            "relays": {
+              "heater": false,
+              "mist": false,
+              "fan": true,
+              "light": true
+            }
+          },
+          {
+            "id": "69df859b338c4c10d49d3ce9",
+            "userId": "67c6fd9a9acfdbc1d05c22b1",
+            "timestamp": "2026-04-15T19:33:31.065+07:00",
+            "temperature": 30.2,
+            "humidity": 70.6,
+            "lux": 0,
+            "sensor_fault": false,
+            "user_override": false,
+            "relays": {
+              "heater": false,
+              "mist": false,
+              "fan": true,
+              "light": true
+            }
+          },
+          {
+            "id": "69df8071546c2ef40e55af60",
+            "userId": "67c6fd9a9acfdbc1d05c22b1",
+            "timestamp": "2026-04-15T19:11:29.616+07:00",
+            "temperature": 30.2,
+            "humidity": 70.6,
+            "lux": 0,
+            "sensor_fault": false,
+            "user_override": false,
+            "relays": {
+              "heater": false,
+              "mist": false,
+              "fan": true,
+              "light": true
+            }
+          },
+          {
+            "id": "69df63905ce8f57dd413c245",
+            "userId": "67c6fd9a9acfdbc1d05c22b1",
+            "timestamp": "2026-04-15T17:08:16.998+07:00",
+            "temperature": 30.2,
+            "humidity": 70.6,
+            "lux": 0,
+            "sensor_fault": false,
+            "user_override": false,
+            "relays": {
+              "heater": false,
+              "mist": false,
+              "fan": true,
+              "light": true
+            }
+          },
+          {
+            "id": "69df55a74c0b0e46d73fa43d",
+            "userId": "67c6fd9a9acfdbc1d05c22b1",
+            "timestamp": "2026-04-15T16:08:55.436+07:00",
+            "temperature": 30.2,
+            "humidity": 70.6,
+            "lux": 0,
+            "sensor_fault": false,
+            "user_override": false,
+            "relays": {
+              "heater": false,
+              "mist": false,
+              "fan": true,
+              "light": true
+            }
+          },
+          {
+            "id": "69df39fcd041d2c733b326ba",
+            "userId": "67c6fd9a9acfdbc1d05c22b1",
+            "timestamp": "2026-04-15T14:10:52.334+07:00",
+            "temperature": 30.2,
+            "humidity": 70.6,
+            "lux": 0,
+            "sensor_fault": false,
+            "user_override": false,
+            "relays": {
+              "heater": false,
+              "mist": false,
+              "fan": true,
+              "light": true
+            }
+          },
+          {
+            "id": "69df315baa3fd0883d0f5166",
+            "userId": "67c6fd9a9acfdbc1d05c22b1",
+            "timestamp": "2026-04-15T13:34:03.515+07:00",
+            "temperature": 30.2,
+            "humidity": 70.6,
+            "lux": 0,
+            "sensor_fault": false,
+            "user_override": false,
+            "relays": {
+              "heater": false,
+              "mist": false,
+              "fan": true,
+              "light": true
+            }
+          },
+          {
+            "id": "69df313ae43fc237d0dc61b0",
+            "userId": "67c6fd9a9acfdbc1d05c22b1",
+            "timestamp": "2026-04-15T13:33:30.440+07:00",
+            "temperature": 30.2,
+            "humidity": 70.6,
+            "lux": 0,
+            "sensor_fault": false,
+            "user_override": false,
+            "relays": {
+              "heater": false,
+              "mist": false,
+              "fan": true,
+              "light": true
+            }
+          },
+          {
+            "id": "69df307ef4852611f4488a9d",
+            "userId": "67c6fd9a9acfdbc1d05c22b1",
+            "timestamp": "2026-04-15T13:30:22.292+07:00",
+            "temperature": 30.2,
+            "humidity": 70.6,
+            "lux": 0,
+            "sensor_fault": false,
+            "user_override": false,
+            "relays": {
+              "heater": false,
+              "mist": false,
+              "fan": true,
+              "light": true
+            }
+          }
+        ]
+      },
+      "error": null
+    },
+    {
+      "step": "GET /api/devices/{deviceId}",
+      "pass": true,
+      "expectedStatuses": [
+        200,
+        404
+      ],
+      "status": 200,
+      "timeout": false,
+      "durationMs": 2996.0062,
+      "body": {
+        "deviceId": "67c6fd9a9acfdbc1d05c22b1",
+        "mode": "AUTO",
+        "user_override": false,
+        "relays": {
+          "heater": false,
+          "mist": false,
+          "fan": false,
+          "light": false
+        },
+        "lastTelemetryAt": null,
+        "lastCommandAt": "2026-04-02T22:13:26.466+07:00",
+        "updatedAt": "2026-04-16T13:58:06.544+07:00"
+      },
+      "error": null
+    },
+    {
+      "step": "PATCH /api/devices/{deviceId}",
+      "pass": true,
+      "expectedStatuses": [
+        200
+      ],
+      "status": 200,
+      "timeout": false,
+      "durationMs": 709.6489000000001,
+      "body": {
+        "deviceId": "67c6fd9a9acfdbc1d05c22b1",
+        "mode": "AUTO",
+        "user_override": false,
+        "relays": {
+          "heater": false,
+          "mist": false,
+          "fan": false,
+          "light": false
+        },
+        "lastTelemetryAt": null,
+        "lastCommandAt": "2026-04-02T22:13:26.466+07:00",
+        "updatedAt": "2026-04-21T11:58:22.832+07:00"
+      },
+      "error": null
+    },
+    {
+      "step": "GET /api/devices/{deviceId}/control",
+      "pass": true,
+      "expectedStatuses": [
+        200
+      ],
+      "status": 200,
+      "timeout": false,
+      "durationMs": 914.1276999999991,
+      "body": {
+        "deviceId": "67c6fd9a9acfdbc1d05c22b1",
+        "history": [
+          {
+            "_id": "69e088c38a76700ddcb63418",
+            "deviceId": "67c6fd9a9acfdbc1d05c22b1",
+            "userId": "67c6fd9a9acfdbc1d05c22b1",
+            "state": {
+              "light": false,
+              "fan": true,
+              "mist": false
+            },
+            "source": "user",
+            "createdAt": "2026-04-16T13:59:15.384+07:00"
+          },
+          {
+            "_id": "69e088c28a76700ddcb63417",
+            "deviceId": "67c6fd9a9acfdbc1d05c22b1",
+            "userId": "67c6fd9a9acfdbc1d05c22b1",
+            "state": {
+              "light": true,
+              "fan": false,
+              "mist": false
+            },
+            "source": "user",
+            "createdAt": "2026-04-16T13:59:14.537+07:00"
+          },
+          {
+            "_id": "69e088c18a76700ddcb63416",
+            "deviceId": "67c6fd9a9acfdbc1d05c22b1",
+            "userId": "67c6fd9a9acfdbc1d05c22b1",
+            "state": {
+              "light": false,
+              "fan": true,
+              "mist": false
+            },
+            "source": "user",
+            "createdAt": "2026-04-16T13:59:13.672+07:00"
+          },
+          {
+            "_id": "69e088c08a76700ddcb63415",
+            "deviceId": "67c6fd9a9acfdbc1d05c22b1",
+            "userId": "67c6fd9a9acfdbc1d05c22b1",
+            "state": {
+              "light": true,
+              "fan": false,
+              "mist": false
+            },
+            "source": "user",
+            "createdAt": "2026-04-16T13:59:12.827+07:00"
+          },
+          {
+            "_id": "69e088bf8a76700ddcb63414",
+            "deviceId": "67c6fd9a9acfdbc1d05c22b1",
+            "userId": "67c6fd9a9acfdbc1d05c22b1",
+            "state": {
+              "light": false,
+              "fan": true,
+              "mist": false
+            },
+            "source": "user",
+            "createdAt": "2026-04-16T13:59:11.982+07:00"
+          },
+          {
+            "_id": "69e088bf8a76700ddcb63413",
+            "deviceId": "67c6fd9a9acfdbc1d05c22b1",
+            "userId": "67c6fd9a9acfdbc1d05c22b1",
+            "state": {
+              "light": true,
+              "fan": false,
+              "mist": false
+            },
+            "source": "user",
+            "createdAt": "2026-04-16T13:59:11.135+07:00"
+          },
+          {
+            "_id": "69e088be8a76700ddcb63412",
+            "deviceId": "67c6fd9a9acfdbc1d05c22b1",
+            "userId": "67c6fd9a9acfdbc1d05c22b1",
+            "state": {
+              "light": false,
+              "fan": true,
+              "mist": false
+            },
+            "source": "user",
+            "createdAt": "2026-04-16T13:59:10.275+07:00"
+          },
+          {
+            "_id": "69e088bd8a76700ddcb63411",
+            "deviceId": "67c6fd9a9acfdbc1d05c22b1",
+            "userId": "67c6fd9a9acfdbc1d05c22b1",
+            "state": {
+              "light": true,
+              "fan": false,
+              "mist": false
+            },
+            "source": "user",
+            "createdAt": "2026-04-16T13:59:09.415+07:00"
+          },
+          {
+            "_id": "69e088bc8a76700ddcb63410",
+            "deviceId": "67c6fd9a9acfdbc1d05c22b1",
+            "userId": "67c6fd9a9acfdbc1d05c22b1",
+            "state": {
+              "light": false,
+              "fan": true,
+              "mist": false
+            },
+            "source": "user",
+            "createdAt": "2026-04-16T13:59:08.556+07:00"
+          },
+          {
+            "_id": "69e088bb8a76700ddcb6340f",
+            "deviceId": "67c6fd9a9acfdbc1d05c22b1",
+            "userId": "67c6fd9a9acfdbc1d05c22b1",
+            "state": {
+              "light": true,
+              "fan": false,
+              "mist": false
+            },
+            "source": "user",
+            "createdAt": "2026-04-16T13:59:07.683+07:00"
+          }
+        ]
+      },
+      "error": null
+    },
+    {
+      "step": "POST /api/devices/{deviceId}/override",
+      "pass": true,
+      "expectedStatuses": [
+        200
+      ],
+      "status": 200,
+      "timeout": false,
+      "durationMs": 1097.3881999999994,
+      "body": {
+        "success": true,
+        "device": "67c6fd9a9acfdbc1d05c22b1",
+        "message": "Override command sent",
+        "mist_locked_off": true
+      },
+      "error": null
+    },
+    {
+      "step": "POST /api/devices/{deviceId}/control",
+      "pass": true,
+      "expectedStatuses": [
+        200,
+        207
+      ],
+      "status": 200,
+      "timeout": false,
+      "durationMs": 1292.2881000000016,
+      "body": {
+        "success": true,
+        "deviceId": "67c6fd9a9acfdbc1d05c22b1",
+        "appliedState": {
+          "light": true,
+          "fan": false,
+          "mist": false
+        },
+        "recordId": "69e703f2f747e931248a79d6",
+        "mist_locked_off": false
+      },
+      "error": null
+    }
+  ],
+  "smokePass": true,
+  "stability": [
+    {
+      "name": "status_get",
+      "method": "GET",
+      "path": "/api/devices/67c6fd9a9acfdbc1d05c22b1/status",
+      "rounds": 20,
+      "acceptStatuses": [
+        200
+      ],
+      "successRate": 1,
+      "timeoutCount": 0,
+      "fetchErrorCount": 0,
+      "statusCounts": {
+        "200": 20
+      },
+      "latencyMs": {
+        "min": 881.6801999999989,
+        "avg": 903.0730700000001,
+        "p50": 896.5320999999967,
+        "p95": 938.6429000000026,
+        "p99": 1002.9002,
+        "max": 1002.9002
+      },
+      "failures": []
+    },
+    {
+      "name": "telemetry_get",
+      "method": "GET",
+      "path": "/api/devices/67c6fd9a9acfdbc1d05c22b1/telemetry?limit=10",
+      "rounds": 20,
+      "acceptStatuses": [
+        200
+      ],
+      "successRate": 1,
+      "timeoutCount": 0,
+      "fetchErrorCount": 0,
+      "statusCounts": {
+        "200": 20
+      },
+      "latencyMs": {
+        "min": 669.0577000000048,
+        "avg": 685.262019999999,
+        "p50": 685.1405999999988,
+        "p95": 695.4334999999992,
+        "p99": 701.1175999999978,
+        "max": 701.1175999999978
+      },
+      "failures": []
+    },
+    {
+      "name": "control_get",
+      "method": "GET",
+      "path": "/api/devices/67c6fd9a9acfdbc1d05c22b1/control?limit=10",
+      "rounds": 20,
+      "acceptStatuses": [
+        200
+      ],
+      "successRate": 1,
+      "timeoutCount": 0,
+      "fetchErrorCount": 0,
+      "statusCounts": {
+        "200": 20
+      },
+      "latencyMs": {
+        "min": 885.9974000000002,
+        "avg": 901.2206199999989,
+        "p50": 897.8369000000021,
+        "p95": 924.6857999999993,
+        "p99": 925.2592999999979,
+        "max": 925.2592999999979
+      },
+      "failures": []
+    },
+    {
+      "name": "override_post",
+      "method": "POST",
+      "path": "/api/devices/67c6fd9a9acfdbc1d05c22b1/override",
+      "rounds": 20,
+      "acceptStatuses": [
+        200
+      ],
+      "successRate": 1,
+      "timeoutCount": 0,
+      "fetchErrorCount": 0,
+      "statusCounts": {
+        "200": 20
+      },
+      "latencyMs": {
+        "min": 1059.9233999999997,
+        "avg": 1082.1401649999984,
+        "p50": 1076.860400000005,
+        "p95": 1129.1310999999987,
+        "p99": 1146.9524999999994,
+        "max": 1146.9524999999994
+      },
+      "failures": []
+    },
+    {
+      "name": "control_post",
+      "method": "POST",
+      "path": "/api/devices/67c6fd9a9acfdbc1d05c22b1/control",
+      "rounds": 20,
+      "acceptStatuses": [
+        200,
+        207
+      ],
+      "successRate": 1,
+      "timeoutCount": 0,
+      "fetchErrorCount": 0,
+      "statusCounts": {
+        "200": 20
+      },
+      "latencyMs": {
+        "min": 1269.2837,
+        "avg": 1287.4310499999992,
+        "p50": 1282.3145000000077,
+        "p95": 1310.296199999997,
+        "p99": 1355.4156000000075,
+        "max": 1355.4156000000075
+      },
+      "failures": []
+    },
+    {
+      "name": "login_post",
+      "method": "POST",
+      "path": "/api/users/login",
+      "rounds": 20,
+      "acceptStatuses": [
+        200
+      ],
+      "successRate": 1,
+      "timeoutCount": 0,
+      "fetchErrorCount": 0,
+      "statusCounts": {
+        "200": 20
+      },
+      "latencyMs": {
+        "min": 825.6138000000064,
+        "avg": 963.2430199999995,
+        "p50": 849.4551999999967,
+        "p95": 882.5084000000061,
+        "p99": 3086.699999999997,
+        "max": 3086.699999999997
+      },
+      "failures": []
+    }
+  ],
+  "unstableCases": []
+}

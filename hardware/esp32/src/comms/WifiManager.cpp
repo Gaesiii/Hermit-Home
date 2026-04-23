@@ -13,10 +13,24 @@ constexpr char kPrefsNs[]          = "wifi";
 constexpr char kKeySsid[]          = "wifi_ssid";
 constexpr char kKeyPassword[]      = "wifi_pass";
 constexpr char kKeyUserId[]        = "user_id";
-constexpr uint32_t kConnectTimeout = 20000UL;
-constexpr uint32_t kBootHoldMs     = 3000UL;
+constexpr char kTerrariumPrefsNs[] = "terrarium";
+constexpr uint32_t kConnectTimeout = 30000UL;
+constexpr uint32_t kReconnectRetryMs = 10000UL;
 const IPAddress kApIp(192, 168, 4, 1);
 const IPAddress kApMask(255, 255, 255, 0);
+
+const __FlashStringHelper* wifiStatusToText(wl_status_t status) {
+    switch (status) {
+        case WL_IDLE_STATUS:    return F("IDLE");
+        case WL_NO_SSID_AVAIL:  return F("NO_SSID_AVAIL");
+        case WL_SCAN_COMPLETED: return F("SCAN_COMPLETED");
+        case WL_CONNECTED:      return F("CONNECTED");
+        case WL_CONNECT_FAILED: return F("CONNECT_FAILED");
+        case WL_CONNECTION_LOST:return F("CONNECTION_LOST");
+        case WL_DISCONNECTED:   return F("DISCONNECTED");
+        default:                return F("UNKNOWN");
+    }
+}
 
 const char kPortalHtml[] PROGMEM = R"html(
 <!doctype html>
@@ -84,7 +98,7 @@ const char kPortalHtml[] PROGMEM = R"html(
       <input id="ssid" name="ssid" placeholder="Ten WiFi" required>
 
       <label for="pass">WiFi Password</label>
-      <input id="pass" name="pass" type="password" placeholder="Mat khau" required>
+      <input id="pass" name="pass" type="password" placeholder="Mat khau (bo trong neu mang mo)">
 
       <label for="user_id">userID</label>
       <input id="user_id" name="user_id" placeholder="VD: 67c6fd..." required>
@@ -148,6 +162,7 @@ WifiManager::WifiManager()
     : _server(80),
       _portalRoutesConfigured(false),
       _apModeActive(false),
+      _lastReconnectAttemptMs(0),
       _bootPressStartMs(0) {}
 
 bool WifiManager::init() {
@@ -184,6 +199,7 @@ void WifiManager::loop() {
         _server.handleClient();
     }
 
+    _maintainStaConnection();
     _checkBootReset();
 }
 
@@ -193,6 +209,39 @@ bool WifiManager::isConnected() const {
 
 const String& WifiManager::getUserId() const {
     return _userId;
+}
+
+void WifiManager::_maintainStaConnection() {
+    if (_ssid.isEmpty() || _userId.isEmpty()) {
+        return;
+    }
+
+    if (WiFi.status() == WL_CONNECTED) {
+        return;
+    }
+
+    const uint32_t now = millis();
+    if ((now - _lastReconnectAttemptMs) < kReconnectRetryMs) {
+        return;
+    }
+
+    _lastReconnectAttemptMs = now;
+
+    if (_apModeActive) {
+        WiFi.mode(WIFI_AP_STA);
+    } else {
+        WiFi.mode(WIFI_STA);
+    }
+
+    Serial.printf("[WiFi] Link lost. Reconnect attempt to '%s' ...\n", _ssid.c_str());
+
+    if (!WiFi.reconnect()) {
+        if (_password.isEmpty()) {
+            WiFi.begin(_ssid.c_str());
+        } else {
+            WiFi.begin(_ssid.c_str(), _password.c_str());
+        }
+    }
 }
 
 void WifiManager::_loadCredentials() {
@@ -216,23 +265,94 @@ void WifiManager::_saveCredentials(const String& ssid,
 bool WifiManager::_connectToWiFi(const String& ssid, const String& password) {
     if (ssid.isEmpty()) return false;
 
+    _printScanHint(ssid);
+
+    WiFi.disconnect(true, true);
+    delay(120);
+
     if (_apModeActive) {
         WiFi.mode(WIFI_AP_STA);
     } else {
         WiFi.mode(WIFI_STA);
     }
 
-    WiFi.begin(ssid.c_str(), password.c_str());
+    WiFi.setSleep(false);
+    if (password.isEmpty()) {
+        WiFi.begin(ssid.c_str());
+    } else {
+        WiFi.begin(ssid.c_str(), password.c_str());
+    }
 
     uint32_t startMs = millis();
+    wl_status_t previousStatus = WiFi.status();
+    Serial.printf("[WiFi] Connecting to '%s' ...\n", ssid.c_str());
+
     while (WiFi.status() != WL_CONNECTED &&
            (millis() - startMs) < kConnectTimeout) {
-        delay(500);
-        Serial.print('.');
+        delay(250);
+
+        const wl_status_t currentStatus = WiFi.status();
+        if (currentStatus != previousStatus) {
+            previousStatus = currentStatus;
+            Serial.printf(
+                "[WiFi] Status -> %s (%d)\n",
+                wifiStatusToText(currentStatus),
+                static_cast<int>(currentStatus)
+            );
+        }
     }
     Serial.println();
 
-    return WiFi.status() == WL_CONNECTED;
+    const wl_status_t finalStatus = WiFi.status();
+    if (finalStatus == WL_CONNECTED) {
+        Serial.printf("[WiFi] Connected. RSSI=%d dBm, IP=%s\n",
+                      WiFi.RSSI(),
+                      WiFi.localIP().toString().c_str());
+        return true;
+    }
+
+    Serial.printf("[WiFi] Connect failed. Final status=%s (%d)\n",
+                  wifiStatusToText(finalStatus),
+                  static_cast<int>(finalStatus));
+    if (finalStatus == WL_CONNECT_FAILED) {
+        Serial.println(F("[WiFi] Hint: Wrong password or router security mode unsupported (e.g. WPA3-only)."));
+    } else if (finalStatus == WL_NO_SSID_AVAIL) {
+        Serial.println(F("[WiFi] Hint: SSID not found. Ensure 2.4GHz is enabled and SSID is in range."));
+    }
+
+    return false;
+}
+
+void WifiManager::_printScanHint(const String& targetSsid) {
+    const int networkCount = WiFi.scanNetworks(false, true);
+    if (networkCount <= 0) {
+        Serial.println(F("[WiFi] Scan: no visible SSID from ESP location."));
+        WiFi.scanDelete();
+        return;
+    }
+
+    bool foundTarget = false;
+    for (int i = 0; i < networkCount; ++i) {
+        if (WiFi.SSID(i) == targetSsid) {
+            foundTarget = true;
+            Serial.printf(
+                "[WiFi] Scan: found target SSID '%s' (RSSI=%d dBm, channel=%d).\n",
+                targetSsid.c_str(),
+                WiFi.RSSI(i),
+                WiFi.channel(i)
+            );
+            break;
+        }
+    }
+
+    if (!foundTarget) {
+        Serial.printf(
+            "[WiFi] Scan: target SSID '%s' not visible to ESP. Could be out of range, hidden, or 5GHz-only.\n",
+            targetSsid.c_str()
+        );
+    }
+
+    WiFi.scanDelete();
 }
 
 void WifiManager::_startApPortal() {
@@ -268,12 +388,8 @@ void WifiManager::_checkBootReset() {
     if (digitalRead(BOOT_PIN) == LOW) {
         if (_bootPressStartMs == 0) {
             _bootPressStartMs = millis();
-        } else if ((millis() - _bootPressStartMs) >= kBootHoldMs) {
-            Serial.println(F("[WiFi] BOOT held for 3s. Clearing WiFi/user config."));
-            _clearCredentials();
-            WiFi.disconnect(true, true);
-            delay(300);
-            ESP.restart();
+        } else if ((millis() - _bootPressStartMs) >= BOOT_HOLD_RESET_MS) {
+            _factoryResetAndReboot();
         }
         return;
     }
@@ -290,6 +406,25 @@ void WifiManager::_clearCredentials() {
     _userId = "";
 }
 
+void WifiManager::_factoryResetAndReboot() {
+    Serial.println(F("[WiFi] BOOT held for 3s. Factory reset requested."));
+
+    _clearCredentials();
+
+    // Clear persisted terrarium thresholds as part of full device reset.
+    Preferences terrariumPrefs;
+    if (terrariumPrefs.begin(kTerrariumPrefsNs, false)) {
+        terrariumPrefs.clear();
+        terrariumPrefs.end();
+    }
+
+    WiFi.disconnect(true, true);
+    delay(300);
+
+    Serial.println(F("[WiFi] Rebooting. Captive portal will start for WiFi + userID setup."));
+    ESP.restart();
+}
+
 void WifiManager::_handleRoot() {
     _server.send_P(200, "text/html", kPortalHtml);
 }
@@ -300,6 +435,7 @@ void WifiManager::_handleConnect() {
     String userId = _server.arg("user_id");
 
     ssid.trim();
+    pass.trim();
     userId.trim();
 
     if (ssid.isEmpty() || userId.isEmpty()) {

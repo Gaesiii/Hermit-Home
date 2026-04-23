@@ -6,8 +6,11 @@ import '../../core/constants/app_constants.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../auth/auth_routes.dart';
+import 'data/chat_history_store.dart';
+import 'data/chatbox_repository.dart';
 import 'data/device_control_repository.dart';
 import 'data/telemetry_repository.dart';
+import 'domain/chatbox_models.dart';
 import 'domain/device_control_state.dart';
 import 'domain/telemetry_model.dart';
 
@@ -23,6 +26,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final TelemetryRepository _telemetryRepository = TelemetryRepository();
   final DeviceControlRepository _deviceControlRepository =
       DeviceControlRepository();
+  final ChatHistoryStore _chatHistoryStore = ChatHistoryStore();
+  final ChatboxRepository _chatboxRepository = ChatboxRepository();
+  final TextEditingController _chatboxController = TextEditingController();
+  final ScrollController _chatboxScrollController = ScrollController();
 
   bool _isLoading = true;
 
@@ -42,10 +49,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String? _deviceStateError;
   final Set<String> _pendingControlKeys = <String>{};
 
+  List<ChatboxMessage> _chatMessages = const [];
+  List<String> _chatSuggestions = const [];
+  String _chatboxDraft = '';
+  bool _isLoadingChatboxSuggestions = false;
+  bool _isSendingChatMessage = false;
+  DateTime? _chatboxUpdatedAt;
+  String? _chatboxError;
+
   @override
   void initState() {
     super.initState();
     _loadSession();
+  }
+
+  @override
+  void dispose() {
+    _chatboxController.dispose();
+    _chatboxScrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSession() async {
@@ -80,36 +102,63 @@ class _DashboardScreenState extends State<DashboardScreen> {
       historyCount: 0,
     );
     String? controlError;
+    ChatboxReply? chatboxReply;
+    String? chatboxError;
+    List<ChatboxMessage> persistedChatMessages = const <ChatboxMessage>[];
+
+    if (resolvedUserId != null && resolvedUserId.isNotEmpty) {
+      persistedChatMessages = await _chatHistoryStore.readHistory(resolvedUserId);
+    }
 
     if (resolvedUserId == null || resolvedUserId.isEmpty) {
       telemetryError = 'Cannot find userId in current session.';
       controlError = 'Cannot find userId in current session.';
+      chatboxError = 'Cannot find userId in current session.';
     } else if (token == null || token.isEmpty) {
       telemetryError = 'Cannot find valid access token.';
       controlError = 'Cannot find valid access token.';
+      chatboxError = 'Cannot find valid access token.';
     } else {
-      try {
-        telemetry = await _telemetryRepository.fetchByUserId(
-          userId: resolvedUserId,
-          token: token,
-          limit: 40,
-        );
-      } catch (error) {
-        telemetryError = error.toString().replaceFirst('Exception: ', '');
-      }
-
-      try {
-        controlSnapshot = await _deviceControlRepository.fetchCurrentState(
-          userId: resolvedUserId,
-          token: token,
-          limit: 100,
-        );
-      } catch (error) {
-        controlError = error.toString().replaceFirst('Exception: ', '');
-      }
+      await Future.wait<void>([
+        () async {
+          try {
+            telemetry = await _telemetryRepository.fetchByUserId(
+              userId: resolvedUserId,
+              token: token,
+              limit: 40,
+            );
+          } catch (error) {
+            telemetryError = error.toString().replaceFirst('Exception: ', '');
+          }
+        }(),
+        () async {
+          try {
+            controlSnapshot = await _deviceControlRepository.fetchCurrentState(
+              userId: resolvedUserId,
+              token: token,
+              limit: 100,
+            );
+          } catch (error) {
+            controlError = error.toString().replaceFirst('Exception: ', '');
+          }
+        }(),
+        () async {
+          try {
+            chatboxReply = await _chatboxRepository.fetchSuggestions(
+              userId: resolvedUserId,
+              token: token,
+            );
+          } catch (error) {
+            chatboxError = error.toString().replaceFirst('Exception: ', '');
+          }
+        }(),
+      ]);
     }
 
     if (!mounted) return;
+
+    final shouldResetChat = _userId != null && _userId != resolvedUserId;
+    var seededAssistantFromSuggestions = false;
 
     setState(() {
       _email = email;
@@ -128,8 +177,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _deviceStateError = controlError;
       _pendingControlKeys.clear();
 
+      if (shouldResetChat) {
+        _chatSuggestions = const [];
+        _chatboxDraft = '';
+        _chatboxController.clear();
+        _isLoadingChatboxSuggestions = false;
+        _isSendingChatMessage = false;
+        _chatboxUpdatedAt = null;
+        _chatboxError = null;
+      }
+
+      final shouldHydrateChat = shouldResetChat || _chatMessages.isEmpty;
+      if (shouldHydrateChat) {
+        _chatMessages = persistedChatMessages;
+      }
+
+      if (chatboxReply != null) {
+        _chatSuggestions = chatboxReply!.suggestions;
+        _chatboxUpdatedAt = DateTime.now();
+        _chatboxError = null;
+
+        final answer = chatboxReply!.answer.trim();
+        if (_chatMessages.isEmpty && answer.isNotEmpty) {
+          _chatMessages = <ChatboxMessage>[ChatboxMessage.assistant(answer)];
+          seededAssistantFromSuggestions = true;
+        }
+      } else if (chatboxError != null) {
+        _chatboxError = chatboxError;
+      }
+      _isLoadingChatboxSuggestions = false;
+
       _isLoading = false;
     });
+
+    if (seededAssistantFromSuggestions) {
+      await _persistChatHistory();
+    }
+
+    if ((chatboxReply != null || persistedChatMessages.isNotEmpty) &&
+        _chatMessages.isNotEmpty) {
+      _queueChatScrollToBottom();
+    }
   }
 
   Future<void> _toggleDevice(String deviceKey, bool enabled) async {
@@ -187,6 +275,208 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  Future<void> _refreshChatboxSuggestions() async {
+    final userId = _userId;
+    final token = _token;
+
+    if (userId == null || userId.isEmpty || token == null || token.isEmpty) {
+      _showSnack('Session is missing userId or token. Please sign in again.');
+      return;
+    }
+
+    if (_isLoadingChatboxSuggestions || _isSendingChatMessage) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingChatboxSuggestions = true;
+      _chatboxError = null;
+    });
+
+    try {
+      final reply = await _chatboxRepository.fetchSuggestions(
+        userId: userId,
+        token: token,
+      );
+
+      if (!mounted) return;
+      var seededAssistant = false;
+
+      setState(() {
+        _chatSuggestions = reply.suggestions;
+        _chatboxUpdatedAt = DateTime.now();
+        _chatboxError = null;
+        _isLoadingChatboxSuggestions = false;
+
+        final answer = reply.answer.trim();
+        if (_chatMessages.isEmpty && answer.isNotEmpty) {
+          _chatMessages = <ChatboxMessage>[ChatboxMessage.assistant(answer)];
+          seededAssistant = true;
+        }
+      });
+
+      if (seededAssistant) {
+        await _persistChatHistory();
+      }
+
+      _queueChatScrollToBottom();
+    } catch (error) {
+      if (!mounted) return;
+
+      final errorMessage = error.toString().replaceFirst('Exception: ', '');
+      setState(() {
+        _chatboxError = errorMessage;
+        _isLoadingChatboxSuggestions = false;
+      });
+
+      _showSnack(errorMessage);
+    }
+  }
+
+  Future<void> _sendChatMessage([String? preset]) async {
+    final userId = _userId;
+    final token = _token;
+
+    if (userId == null || userId.isEmpty || token == null || token.isEmpty) {
+      _showSnack('Session is missing userId or token. Please sign in again.');
+      return;
+    }
+
+    if (_isSendingChatMessage) {
+      return;
+    }
+
+    final message = (preset ?? _chatboxController.text).trim();
+    if (message.isEmpty) {
+      return;
+    }
+
+    final historyBeforeSend = List<ChatboxMessage>.from(_chatMessages);
+    final requestContext = _isContextRequest(message);
+
+    setState(() {
+      _chatMessages = <ChatboxMessage>[
+        ..._chatMessages,
+        ChatboxMessage.user(message),
+      ];
+      _chatboxController.clear();
+      _chatboxDraft = '';
+      _chatboxError = null;
+      _isSendingChatMessage = true;
+    });
+
+    await _persistChatHistory();
+    _queueChatScrollToBottom();
+
+    try {
+      final reply = await _chatboxRepository.sendMessage(
+        userId: userId,
+        token: token,
+        message: message,
+        history: historyBeforeSend,
+        requestContext: requestContext,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        final answer = reply.answer.trim();
+        if (answer.isNotEmpty) {
+          _chatMessages = <ChatboxMessage>[
+            ..._chatMessages,
+            ChatboxMessage.assistant(answer),
+          ];
+        }
+
+        _chatSuggestions = reply.suggestions;
+        _chatboxUpdatedAt = DateTime.now();
+        _chatboxError = null;
+        _isSendingChatMessage = false;
+      });
+
+      await _persistChatHistory();
+      _queueChatScrollToBottom();
+    } catch (error) {
+      if (!mounted) return;
+
+      final errorMessage = error.toString().replaceFirst('Exception: ', '');
+      setState(() {
+        _chatboxError = errorMessage;
+        _isSendingChatMessage = false;
+      });
+
+      _showSnack(errorMessage);
+    }
+  }
+
+  bool _isContextRequest(String message) {
+    final normalized =
+        message.toLowerCase().replaceAll(RegExp(r'\s+'), ' ').trim();
+    const triggers = <String>[
+      'l\u1ea5y ng\u1eef c\u1ea3nh',
+      'lay ngu canh',
+      'ng\u1eef c\u1ea3nh',
+      'ngu canh',
+      'l\u1ea5y b\u1ed1i c\u1ea3nh',
+      'lay boi canh',
+      'context',
+      'context snapshot',
+      'summary context',
+      'tom tat ngu canh',
+      't\u00f3m t\u1eaft ng\u1eef c\u1ea3nh',
+      'context tong hop',
+    ];
+    return triggers.any(normalized.contains);
+  }
+
+  Future<void> _persistChatHistory() async {
+    final userId = _userId;
+    if (userId == null || userId.isEmpty) {
+      return;
+    }
+
+    try {
+      await _chatHistoryStore.writeHistory(userId, _chatMessages);
+    } catch (_) {
+      // Ignore local persistence errors to avoid blocking the chat flow.
+    }
+  }
+
+  Future<void> _clearChatHistory() async {
+    final userId = _userId;
+    if (userId == null || userId.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _chatMessages = const <ChatboxMessage>[];
+    });
+
+    try {
+      await _chatHistoryStore.clearHistory(userId);
+    } catch (_) {
+      // Ignore local persistence errors to keep UI responsive.
+    }
+  }
+
+  void _queueChatScrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      if (!_chatboxScrollController.hasClients) {
+        return;
+      }
+
+      final maxExtent = _chatboxScrollController.position.maxScrollExtent;
+      _chatboxScrollController.animateTo(
+        maxExtent,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
   void _showSnack(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -239,6 +529,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _buildDeviceControlsCard(),
                   const SizedBox(height: 14),
                   _buildTelemetryCard(),
+                  const SizedBox(height: 14),
+                  _buildChatboxCard(),
                   const SizedBox(height: 14),
                   _buildSessionCard(),
                 ],
@@ -492,6 +784,198 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Widget _buildChatboxCard() {
+    final isBusy = _isLoadingChatboxSuggestions || _isSendingChatMessage;
+    final canSend = _chatboxDraft.trim().isNotEmpty && !_isSendingChatMessage;
+
+    return Container(
+      decoration: AppTheme.cardDecoration(radius: 18),
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'AI Chatbox',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceVariant,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: const Color(0xFF2A3530)),
+                ),
+                child: Text(
+                  '${_chatSuggestions.length} tips',
+                  style: const TextStyle(fontSize: 12, color: AppTheme.subtle),
+                ),
+              ),
+              const SizedBox(width: 6),
+              IconButton(
+                onPressed: isBusy ? null : _refreshChatboxSuggestions,
+                icon: _isLoadingChatboxSuggestions
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh_rounded),
+                tooltip: 'Refresh suggestions',
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _chatboxUpdatedAt == null
+                ? 'No chat sync yet.'
+                : 'Last sync: ${_formatDateTime(_chatboxUpdatedAt)}',
+            style: const TextStyle(fontSize: 12, color: AppTheme.subtle),
+          ),
+          if (_chatboxError != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _chatboxError!,
+              style: const TextStyle(color: AppTheme.error, height: 1.4),
+            ),
+          ],
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ActionChip(
+                backgroundColor: AppTheme.surfaceVariant,
+                side: const BorderSide(color: Color(0xFF2A3530)),
+                label: const Text(
+                  'Lay ngu canh',
+                  style: TextStyle(fontSize: 12, color: AppTheme.onSurface),
+                ),
+                onPressed: isBusy
+                    ? null
+                    : () => _sendChatMessage(
+                          'Lay ngu canh hien tai tu telemetry va lich su chat',
+                        ),
+              ),
+              ActionChip(
+                backgroundColor: AppTheme.surfaceVariant,
+                side: const BorderSide(color: Color(0xFF2A3530)),
+                label: const Text(
+                  'Xoa lich su',
+                  style: TextStyle(fontSize: 12, color: AppTheme.onSurface),
+                ),
+                onPressed: isBusy || _chatMessages.isEmpty
+                    ? null
+                    : _clearChatHistory,
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            height: 240,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceVariant,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF2A3530)),
+            ),
+            child: _chatMessages.isEmpty
+                ? Center(
+                    child: Text(
+                      _isLoadingChatboxSuggestions
+                          ? 'Loading chat suggestions...'
+                          : 'Ask AI about current habitat conditions.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppTheme.subtle,
+                        height: 1.4,
+                      ),
+                    ),
+                  )
+                : ListView.separated(
+                    controller: _chatboxScrollController,
+                    itemCount: _chatMessages.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) {
+                      return _ChatBubble(message: _chatMessages[index]);
+                    },
+                  ),
+          ),
+          const SizedBox(height: 10),
+          if (_chatSuggestions.isNotEmpty) ...[
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final tip in _chatSuggestions)
+                  ActionChip(
+                    backgroundColor: AppTheme.surfaceVariant,
+                    side: const BorderSide(color: Color(0xFF2A3530)),
+                    label: Text(
+                      tip.length > 72 ? '${tip.substring(0, 72)}...' : tip,
+                      style:
+                          const TextStyle(fontSize: 12, color: AppTheme.onSurface),
+                    ),
+                    onPressed: _isSendingChatMessage
+                        ? null
+                        : () => _sendChatMessage(tip),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+          ],
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _chatboxController,
+                  minLines: 1,
+                  maxLines: 3,
+                  enabled: !_isSendingChatMessage,
+                  textInputAction: TextInputAction.send,
+                  onChanged: (value) {
+                    setState(() => _chatboxDraft = value);
+                  },
+                  onSubmitted: (_) => _sendChatMessage(),
+                  decoration: const InputDecoration(
+                    hintText: 'Ask AI about temperature, humidity, or relay actions',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: canSend ? _sendChatMessage : null,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(52, 52),
+                  padding: EdgeInsets.zero,
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: _isSendingChatMessage
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.black,
+                        ),
+                      )
+                    : const Icon(Icons.send_rounded),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSessionCard() {
     return Container(
       decoration: AppTheme.cardDecoration(radius: 18),
@@ -670,6 +1154,42 @@ class _DeviceControlTile extends StatelessWidget {
               activeThumbColor: AppTheme.primary,
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _ChatBubble extends StatelessWidget {
+  const _ChatBubble({
+    required this.message,
+  });
+
+  final ChatboxMessage message;
+
+  @override
+  Widget build(BuildContext context) {
+    final isUser = message.isUser;
+    final align = isUser ? Alignment.centerRight : Alignment.centerLeft;
+    final bubbleColor =
+        isUser ? AppTheme.primary.withValues(alpha: 0.18) : AppTheme.surface;
+    final borderColor = isUser
+        ? AppTheme.primary.withValues(alpha: 0.45)
+        : const Color(0xFF2A3530);
+
+    return Align(
+      alignment: align,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 280),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: bubbleColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: borderColor),
+        ),
+        child: Text(
+          message.content,
+          style: const TextStyle(height: 1.35),
+        ),
       ),
     );
   }

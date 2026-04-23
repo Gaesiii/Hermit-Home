@@ -46,6 +46,18 @@ void PriorityController::parseMqttCommand(const JsonDocument& doc) {
     JsonObjectConst threshObj = doc["thresholds"].as<JsonObjectConst>();
     bool changed = _applyThresholdUpdate(threshObj);
 
+    // Optional AI direct device control path (still non-user override):
+    // payload example:
+    // {
+    //   "user_override": false,
+    //   "devices": { "fan": true, "heater": false }
+    // }
+    JsonObjectConst aiDevicesObj = doc["devices"].as<JsonObjectConst>();
+    if (!aiDevicesObj.isNull()) {
+        Serial.println(F("[Priority] Applying AI device control map."));
+        _applyDeviceOverride(aiDevicesObj);
+    }
+
     if (changed) {
         // Persist to NVS so thresholds survive a power cycle.
         _store.saveConfig(_config);

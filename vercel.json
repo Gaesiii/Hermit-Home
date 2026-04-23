@@ -83,6 +83,10 @@
       "dest": "/services/api/api/devices/[deviceId]/action.ts?deviceId=$1"
     },
     {
+      "src": "/api/devices/([^/]+)/chatbox",
+      "dest": "/services/api/api/devices/[deviceId]/chatbox.ts?deviceId=$1"
+    },
+    {
       "src": "/api/devices/([^/]+)/override",
       "dest": "/services/api/api/devices/[deviceId]/action.ts?deviceId=$1&type=override"
     },

@@ -159,6 +159,10 @@ private:
     MQTT_CALLBACK_SIGNATURE;          // stores the injected callback ptr
 
     uint32_t _lastReconnectAttemptMs; // tracks non-blocking retry cadence
+    uint32_t _lastTimeSyncAttemptMs;
+
+    char     _brokerHost[128];
+    uint16_t _brokerPort;
 
     /**
      * @brief Internal blocking-free reconnect attempt (called by
@@ -172,9 +176,12 @@ private:
      * @return true on successful connect.
      */
     bool _reconnect();
+    void _normalizeBrokerEndpoint();
+    bool _syncClockIfNeeded();
 
 private:
     String _userId;
+    char   _runtimeClientId[96];
     char   _topicTelemetry[96];
     char   _topicCommands[96];
     char   _topicConfirm[96];
