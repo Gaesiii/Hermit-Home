@@ -56,8 +56,8 @@ Temporary bridge values (mqtt-worker -> Vercel trigger endpoint):
 
 Vercel API values for multi-device agent cycle:
 
-- `AGENT_DEVICE_ID` must be empty (avoid single-device lock)
 - `AGENT_CONTROL_MAX_DEVICES=30` (or your preferred cap)
+- `AGENT_CONTROL_ACTIVE_WINDOW_SECONDS=900` (only control devices with recent telemetry)
 - `AGENT_CONTROL_ENFORCE_ALLOWED_DEVICE_IDS=false` (set `true` only when you intentionally restrict by `ALLOWED_DEVICE_IDS`)
 
 ## CSV Context Notes

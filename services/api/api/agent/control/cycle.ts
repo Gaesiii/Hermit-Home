@@ -19,6 +19,8 @@ const DEFAULT_MIST_SAFETY_LOCK_ENABLED = true;
 const DEFAULT_CSV_SAMPLE_SIZE = 600;
 const DEFAULT_AGENT_CONTROL_MAX_DEVICES = 30;
 const MAX_AGENT_CONTROL_MAX_DEVICES = 200;
+const DEFAULT_AGENT_CONTROL_ACTIVE_WINDOW_SECONDS = 900;
+const MAX_AGENT_CONTROL_ACTIVE_WINDOW_SECONDS = 7 * 24 * 60 * 60;
 
 const SAFETY_THRESHOLDS = {
   temperature: { min: 24.0, max: 29.0 },
@@ -104,6 +106,13 @@ function parsePositiveInteger(raw: string | undefined, fallback: number): number
   if (!raw) return fallback;
   const parsed = Number.parseInt(raw, 10);
   if (!Number.isFinite(parsed) || parsed < 1) return fallback;
+  return parsed;
+}
+
+function parseNonNegativeInteger(raw: string | undefined, fallback: number): number {
+  if (!raw) return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) return fallback;
   return parsed;
 }
 
@@ -194,11 +203,21 @@ async function listTelemetryDeviceIds(
   db: Db,
   maxDevices: number,
   allowedDeviceIds: string[] | null,
+  activeSince: Date | null,
 ): Promise<string[]> {
   const pipeline: Record<string, unknown>[] = [];
+  const match: Record<string, unknown> = {};
+
   if (allowedDeviceIds && allowedDeviceIds.length > 0) {
+    match.userId = { $in: allowedDeviceIds };
+  }
+  if (activeSince) {
+    match.timestamp = { $gte: activeSince };
+  }
+
+  if (Object.keys(match).length > 0) {
     pipeline.push({
-      $match: { userId: { $in: allowedDeviceIds } },
+      $match: match,
     });
   }
 
@@ -236,7 +255,6 @@ async function resolveTargetDeviceIds(params: {
 }): Promise<{ deviceIds: string[]; errorMessage: string | null }> {
   const { req, body, db, isServiceCall, requesterUserId } = params;
   const queryDeviceId = readQueryValue(req.query.deviceId)?.trim() ?? '';
-  const envAgentDeviceId = (process.env.AGENT_DEVICE_ID || '').trim();
   const bodyDeviceIds = parseDeviceIdList(body.deviceIds);
   const bodyDeviceId = typeof body.deviceId === 'string' ? body.deviceId.trim() : '';
 
@@ -244,7 +262,6 @@ async function resolveTargetDeviceIds(params: {
     ...bodyDeviceIds,
     bodyDeviceId,
     queryDeviceId,
-    envAgentDeviceId,
   ].filter(Boolean));
 
   const invalidExplicit = explicitDeviceIds.filter((deviceId) => !isValidDeviceId(deviceId));
@@ -311,15 +328,31 @@ async function resolveTargetDeviceIds(params: {
     1,
     MAX_AGENT_CONTROL_MAX_DEVICES,
   );
+  const activeWindowSeconds = clamp(
+    parseNonNegativeInteger(
+      process.env.AGENT_CONTROL_ACTIVE_WINDOW_SECONDS,
+      DEFAULT_AGENT_CONTROL_ACTIVE_WINDOW_SECONDS,
+    ),
+    0,
+    MAX_AGENT_CONTROL_ACTIVE_WINDOW_SECONDS,
+  );
+  const activeSince =
+    activeWindowSeconds > 0
+      ? new Date(Date.now() - activeWindowSeconds * 1000)
+      : null;
   const autoDetected = await listTelemetryDeviceIds(
     db,
     maxDevices,
     enforceAllowList ? allowedFromEnv : null,
+    activeSince,
   );
   if (autoDetected.length === 0) {
     return {
       deviceIds: [],
-      errorMessage: 'No telemetry-backed device found for automatic agent control cycle.',
+      errorMessage:
+        activeSince !== null
+          ? `No active telemetry-backed device found within the last ${activeWindowSeconds} seconds for automatic agent control cycle.`
+          : 'No telemetry-backed device found for automatic agent control cycle.',
     };
   }
 
