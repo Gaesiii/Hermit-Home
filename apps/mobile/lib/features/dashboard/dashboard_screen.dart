@@ -12,6 +12,8 @@ import 'data/device_control_repository.dart';
 
 enum AppThemeMode { day, auto, night }
 
+enum _MetricStatus { missing, low, normal, high }
+
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -427,6 +429,316 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (value is num) return value.toDouble();
     if (value is String) return double.tryParse(value);
     return null;
+  }
+
+  _MetricStatus _metricStatus(
+    double? value, {
+    required double low,
+    required double high,
+  }) {
+    if (value == null) return _MetricStatus.missing;
+    if (value < low) return _MetricStatus.low;
+    if (value > high) return _MetricStatus.high;
+    return _MetricStatus.normal;
+  }
+
+  String _capitalizeFirst(String text) {
+    if (text.isEmpty) return text;
+    return '${text[0].toUpperCase()}${text.substring(1)}';
+  }
+
+  String _buildAiStatusMessage() {
+    final tempStatus = _metricStatus(_currentTemp, low: 24, high: 28);
+    final humStatus = _metricStatus(_currentHum, low: 70, high: 85);
+
+    if (tempStatus == _MetricStatus.missing &&
+        humStatus == _MetricStatus.missing) {
+      return 'Khong co du lieu nhiet do va do am.';
+    }
+
+    if (tempStatus == _MetricStatus.missing) {
+      switch (humStatus) {
+        case _MetricStatus.low:
+          return 'Khong co du lieu nhiet do, do am dang thap.';
+        case _MetricStatus.high:
+          return 'Khong co du lieu nhiet do, do am dang qua cao.';
+        case _MetricStatus.normal:
+          return 'Khong co du lieu nhiet do, do am dang trong nguong on dinh.';
+        case _MetricStatus.missing:
+          return 'Khong co du lieu nhiet do va do am.';
+      }
+    }
+
+    if (humStatus == _MetricStatus.missing) {
+      switch (tempStatus) {
+        case _MetricStatus.low:
+          return 'Nhiet do dang thap, khong co du lieu do am.';
+        case _MetricStatus.high:
+          return 'Nhiet do dang cao, khong co du lieu do am.';
+        case _MetricStatus.normal:
+          return 'Nhiet do dang trong nguong on dinh, khong co du lieu do am.';
+        case _MetricStatus.missing:
+          return 'Khong co du lieu nhiet do va do am.';
+      }
+    }
+
+    if (tempStatus == _MetricStatus.normal &&
+        humStatus == _MetricStatus.normal) {
+      return 'Nhiet do va do am dang trong nguong on dinh.';
+    }
+
+    String? tempPhrase;
+    if (tempStatus == _MetricStatus.low) {
+      tempPhrase = 'nhiet do dang thap';
+    } else if (tempStatus == _MetricStatus.high) {
+      tempPhrase = 'nhiet do dang cao';
+    }
+
+    String? humPhrase;
+    if (humStatus == _MetricStatus.low) {
+      humPhrase = 'do am dang thap';
+    } else if (humStatus == _MetricStatus.high) {
+      humPhrase = 'do am dang qua cao';
+    }
+
+    if (tempPhrase != null && humPhrase != null) {
+      return '${_capitalizeFirst(tempPhrase)} va $humPhrase.';
+    }
+    if (tempPhrase != null) {
+      return '${_capitalizeFirst(tempPhrase)}, do am dang trong nguong on dinh.';
+    }
+    if (humPhrase != null) {
+      return '${_capitalizeFirst(humPhrase)}, nhiet do dang trong nguong on dinh.';
+    }
+
+    return 'Khong xac dinh duoc trang thai vi khi hau hien tai.';
+  }
+
+  String _buildTemporaryAiReply(String userMessage) {
+    final normalized = userMessage.toLowerCase();
+    if (normalized.contains('nhiet') ||
+        normalized.contains('am') ||
+        normalized.contains('context') ||
+        normalized.contains('ngu canh')) {
+      return _buildAiStatusMessage();
+    }
+
+    if (normalized.contains('xin chao') ||
+        normalized.contains('chao') ||
+        normalized.contains('hello')) {
+      return 'Xin chao. Day la cua so chat tam thoi cua tro ly AI.';
+    }
+
+    return 'Da nhan: "$userMessage". Ban co the hoi them ve nhiet do hoac do am.';
+  }
+
+  void _scrollChatToBottom(ScrollController controller) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!controller.hasClients) return;
+      controller.animateTo(
+        controller.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  void _openAiChatDialog(Color textMain, Color accentColor) {
+    final inputController = TextEditingController();
+    final scrollController = ScrollController();
+    final messages = <_LocalAiChatMessage>[
+      const _LocalAiChatMessage(
+        isUser: false,
+        text: 'Xin chao, day la cua so chat tam thoi cua tro ly AI.',
+      ),
+      _LocalAiChatMessage(
+        isUser: false,
+        text: _buildAiStatusMessage(),
+      ),
+    ];
+
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.55),
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: StatefulBuilder(
+            builder: (context, setDialogState) {
+              void sendMessage() {
+                final raw = inputController.text.trim();
+                if (raw.isEmpty) return;
+
+                setDialogState(() {
+                  messages.add(_LocalAiChatMessage(isUser: true, text: raw));
+                  messages.add(
+                    _LocalAiChatMessage(
+                      isUser: false,
+                      text: _buildTemporaryAiReply(raw),
+                    ),
+                  );
+                });
+
+                inputController.clear();
+                _scrollChatToBottom(scrollController);
+              }
+
+              return ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                  child: Container(
+                    constraints: const BoxConstraints(maxHeight: 560),
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: accentColor.withOpacity(0.45),
+                        width: 1.4,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.auto_awesome_rounded,
+                              color: accentColor,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Tro ly AI (tam thoi)',
+                                style: TextStyle(
+                                  color: textMain,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () =>
+                                  Navigator.of(dialogContext).pop(),
+                              icon: Icon(
+                                Icons.close_rounded,
+                                color: textMain.withOpacity(0.8),
+                              ),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Expanded(
+                          child: ListView.builder(
+                            controller: scrollController,
+                            itemCount: messages.length,
+                            itemBuilder: (context, index) {
+                              final msg = messages[index];
+                              final align = msg.isUser
+                                  ? Alignment.centerRight
+                                  : Alignment.centerLeft;
+                              final bgColor = msg.isUser
+                                  ? accentColor.withOpacity(0.24)
+                                  : Colors.white.withOpacity(0.12);
+
+                              return Align(
+                                alignment: align,
+                                child: Container(
+                                  margin:
+                                      const EdgeInsets.symmetric(vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 9,
+                                  ),
+                                  constraints:
+                                      const BoxConstraints(maxWidth: 280),
+                                  decoration: BoxDecoration(
+                                    color: bgColor,
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: Colors.white.withOpacity(0.15),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    msg.text,
+                                    style: TextStyle(
+                                      color: textMain,
+                                      fontSize: 13.5,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: inputController,
+                                textInputAction: TextInputAction.send,
+                                minLines: 1,
+                                maxLines: 3,
+                                onSubmitted: (_) => sendMessage(),
+                                style: TextStyle(color: textMain),
+                                decoration: InputDecoration(
+                                  hintText: 'Nhap tin nhan...',
+                                  hintStyle: TextStyle(
+                                      color: textMain.withOpacity(0.6)),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 10,
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.white.withOpacity(0.1),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(
+                                      color: Colors.white.withOpacity(0.2),
+                                    ),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(
+                                      color: Colors.white.withOpacity(0.2),
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: accentColor),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              onPressed: sendMessage,
+                              icon: Icon(
+                                Icons.send_rounded,
+                                color: accentColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    ).whenComplete(() {
+      inputController.dispose();
+      scrollController.dispose();
+    });
   }
 
   Future<void> _toggleDevice(String deviceKey, bool enabled) async {
@@ -1094,44 +1406,59 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Widget _buildAIStatusCard(Color textMain, Color accentColor) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-          color: accentColor.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: accentColor.withOpacity(0.4), width: 1.5)),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-                color: accentColor.withOpacity(0.2), shape: BoxShape.circle),
-            child:
-                Icon(Icons.auto_awesome_rounded, color: accentColor, size: 24),
-          ),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text("Trợ lý AI:",
-                      style: TextStyle(
-                          color: textMain.withOpacity(0.8),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600)),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                    "Mọi thứ đều ổn định! Vi khí hậu hiện tại rất hoàn hảo cho bầy cư dân của bạn.",
-                    style:
-                        TextStyle(color: textMain, fontSize: 14, height: 1.4)),
-              ],
+    final statusMessage = _buildAiStatusMessage();
+
+    return GestureDetector(
+      onTap: () => _openAiChatDialog(textMain, accentColor),
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+            color: accentColor.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(20),
+            border:
+                Border.all(color: accentColor.withOpacity(0.4), width: 1.5)),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                  color: accentColor.withOpacity(0.2), shape: BoxShape.circle),
+              child: Icon(Icons.auto_awesome_rounded,
+                  color: accentColor, size: 24),
             ),
-          )
-        ],
+            const SizedBox(width: 15),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text('Tro ly AI:',
+                        style: TextStyle(
+                            color: textMain.withOpacity(0.8),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600)),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(statusMessage,
+                      style: TextStyle(
+                          color: textMain, fontSize: 14, height: 1.4)),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Nhan de mo cua so chat tam thoi',
+                    style: TextStyle(
+                      color: accentColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          ],
+        ),
       ),
     );
   }
@@ -1604,6 +1931,16 @@ class _DashboardScreenState extends State<DashboardScreen>
             hasGlow: hasGlow),
         child: Container());
   }
+}
+
+class _LocalAiChatMessage {
+  const _LocalAiChatMessage({
+    required this.isUser,
+    required this.text,
+  });
+
+  final bool isUser;
+  final String text;
 }
 
 // --- CUSTOM PAINTERS ---
