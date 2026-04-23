@@ -8,7 +8,10 @@ import 'package:http/http.dart' as http;
 
 import '../../core/services/auth_service.dart';
 import '../../core/constants/app_constants.dart';
+import 'data/chat_history_store.dart';
+import 'data/chatbox_repository.dart';
 import 'data/device_control_repository.dart';
+import 'domain/chatbox_models.dart';
 
 enum AppThemeMode { day, auto, night }
 
@@ -35,8 +38,16 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   final AuthService _authService = AuthService();
   final DeviceControlRepository _controlRepo = DeviceControlRepository();
+  final ChatHistoryStore _chatHistoryStore = ChatHistoryStore();
+  final ChatboxRepository _chatboxRepository = ChatboxRepository();
 
   bool _isSyncingData = false;
+  bool _isHydratingChatHistory = false;
+  bool _isSendingChatMessage = false;
+  String? _chatboxError;
+  DateTime? _chatboxUpdatedAt;
+  List<ChatboxMessage> _chatMessages = const <ChatboxMessage>[];
+  List<String> _chatSuggestions = const <String>[];
 
   // --- BIẾN STATE CHO TAB HỒ SƠ ---
   String _userIdDisplay = "Loading...";
@@ -103,6 +114,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadUserProfile();
       _syncDataFromDatabase(resetPagination: true);
+      _loadChatHistoryIfNeeded();
     });
   }
 
@@ -283,7 +295,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Đã copy User ID'),
+        content: Text('Đã sao chép IdUser'),
         duration: Duration(milliseconds: 900),
       ),
     );
@@ -307,7 +319,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       final token = await _authService.getToken();
       final userId = await _authService.getUserId();
       if (token == null || userId == null) {
-        throw Exception('Xac thuc that bai.');
+        throw Exception('Xác thực thất bại.');
       }
 
       final controlSnapshot =
@@ -330,7 +342,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
       if (teleResponse.statusCode != 200) {
         throw Exception(
-            'Khong the tai telemetry (HTTP ${teleResponse.statusCode}).');
+            'Không thể tải telemetry (HTTP ${teleResponse.statusCode}).');
       }
 
       final decoded = jsonDecode(teleResponse.body) as Map<String, dynamic>;
@@ -453,83 +465,183 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     if (tempStatus == _MetricStatus.missing &&
         humStatus == _MetricStatus.missing) {
-      return 'Khong co du lieu nhiet do va do am.';
+      return 'Không có dữ liệu nhiệt độ và độ ẩm.';
     }
 
     if (tempStatus == _MetricStatus.missing) {
       switch (humStatus) {
         case _MetricStatus.low:
-          return 'Khong co du lieu nhiet do, do am dang thap.';
+          return 'Không có dữ liệu nhiệt độ, độ ẩm đang thấp.';
         case _MetricStatus.high:
-          return 'Khong co du lieu nhiet do, do am dang qua cao.';
+          return 'Không có dữ liệu nhiệt độ, độ ẩm đang quá cao.';
         case _MetricStatus.normal:
-          return 'Khong co du lieu nhiet do, do am dang trong nguong on dinh.';
+          return 'Không có dữ liệu nhiệt độ, độ ẩm đang trong ngưỡng ổn định.';
         case _MetricStatus.missing:
-          return 'Khong co du lieu nhiet do va do am.';
+          return 'Không có dữ liệu nhiệt độ và độ ẩm.';
       }
     }
 
     if (humStatus == _MetricStatus.missing) {
       switch (tempStatus) {
         case _MetricStatus.low:
-          return 'Nhiet do dang thap, khong co du lieu do am.';
+          return 'Nhiệt độ đang thấp, không có dữ liệu độ ẩm.';
         case _MetricStatus.high:
-          return 'Nhiet do dang cao, khong co du lieu do am.';
+          return 'Nhiệt độ đang cao, không có dữ liệu độ ẩm.';
         case _MetricStatus.normal:
-          return 'Nhiet do dang trong nguong on dinh, khong co du lieu do am.';
+          return 'Nhiệt độ đang trong ngưỡng ổn định, không có dữ liệu độ ẩm.';
         case _MetricStatus.missing:
-          return 'Khong co du lieu nhiet do va do am.';
+          return 'Không có dữ liệu nhiệt độ và độ ẩm.';
       }
     }
 
     if (tempStatus == _MetricStatus.normal &&
         humStatus == _MetricStatus.normal) {
-      return 'Nhiet do va do am dang trong nguong on dinh.';
+      return 'Nhiệt độ và độ ẩm đang trong ngưỡng ổn định.';
     }
 
     String? tempPhrase;
     if (tempStatus == _MetricStatus.low) {
-      tempPhrase = 'nhiet do dang thap';
+      tempPhrase = 'nhiệt độ đang thấp';
     } else if (tempStatus == _MetricStatus.high) {
-      tempPhrase = 'nhiet do dang cao';
+      tempPhrase = 'nhiệt độ đang cao';
     }
 
     String? humPhrase;
     if (humStatus == _MetricStatus.low) {
-      humPhrase = 'do am dang thap';
+      humPhrase = 'độ ẩm đang thấp';
     } else if (humStatus == _MetricStatus.high) {
-      humPhrase = 'do am dang qua cao';
+      humPhrase = 'độ ẩm đang quá cao';
     }
 
     if (tempPhrase != null && humPhrase != null) {
-      return '${_capitalizeFirst(tempPhrase)} va $humPhrase.';
+      return '${_capitalizeFirst(tempPhrase)} và $humPhrase.';
     }
     if (tempPhrase != null) {
-      return '${_capitalizeFirst(tempPhrase)}, do am dang trong nguong on dinh.';
+      return '${_capitalizeFirst(tempPhrase)}, độ ẩm đang trong ngưỡng ổn định.';
     }
     if (humPhrase != null) {
-      return '${_capitalizeFirst(humPhrase)}, nhiet do dang trong nguong on dinh.';
+      return '${_capitalizeFirst(humPhrase)}, nhiệt độ đang trong ngưỡng ổn định.';
     }
 
-    return 'Khong xac dinh duoc trang thai vi khi hau hien tai.';
+    return 'Không xác định được trạng thái vi khí hậu hiện tại.';
   }
 
-  String _buildTemporaryAiReply(String userMessage) {
-    final normalized = userMessage.toLowerCase();
-    if (normalized.contains('nhiet') ||
-        normalized.contains('am') ||
-        normalized.contains('context') ||
-        normalized.contains('ngu canh')) {
-      return _buildAiStatusMessage();
+  bool _isContextRequest(String message) {
+    final normalized = message.toLowerCase().trim();
+    const contextKeywords = <String>[
+      'context',
+      'ngữ cảnh',
+      'ngu canh',
+      'lấy ngữ cảnh',
+      'lay ngu canh',
+      'bối cảnh',
+      'boi canh',
+      'toàn cảnh',
+      'toan canh',
+      'tổng quan',
+      'tong quan',
+    ];
+    return contextKeywords.any(normalized.contains);
+  }
+
+  String _formatChatTime(DateTime value) {
+    final local = value.toLocal();
+    final day = local.day.toString().padLeft(2, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '$day/$month $hour:$minute';
+  }
+
+  String _buildFriendlyChatError(Object error) {
+    final message = error.toString().replaceFirst('Exception: ', '').trim();
+    if (message.isEmpty) {
+      return 'Không thể kết nối trợ lý AI lúc này.';
+    }
+    return message;
+  }
+
+  Future<void> _loadChatHistoryIfNeeded() async {
+    if (_isHydratingChatHistory || _chatMessages.isNotEmpty) return;
+
+    if (mounted) {
+      setState(() {
+        _isHydratingChatHistory = true;
+        _chatboxError = null;
+      });
     }
 
-    if (normalized.contains('xin chao') ||
-        normalized.contains('chao') ||
-        normalized.contains('hello')) {
-      return 'Xin chao. Day la cua so chat tam thoi cua tro ly AI.';
-    }
+    try {
+      final userId = (await _authService.getUserId())?.trim();
+      if (userId == null || userId.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _chatMessages = <ChatboxMessage>[
+            ChatboxMessage.assistant(
+              'Không tìm thấy IdUser trong phiên đăng nhập hiện tại.',
+            ),
+          ];
+        });
+        return;
+      }
 
-    return 'Da nhan: "$userMessage". Ban co the hoi them ve nhiet do hoac do am.';
+      final persisted = await _chatHistoryStore.readHistory(userId);
+      final hydratedMessages = persisted.isNotEmpty
+          ? persisted
+          : <ChatboxMessage>[
+              ChatboxMessage.assistant(
+                'Xin chào, mình là Trợ lý AI của Hermit Home.',
+              ),
+              ChatboxMessage.assistant(_buildAiStatusMessage()),
+            ];
+
+      if (!mounted) return;
+      setState(() {
+        _chatMessages = hydratedMessages;
+      });
+
+      if (persisted.isEmpty) {
+        await _chatHistoryStore.writeHistory(userId, hydratedMessages);
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _chatboxError = _buildFriendlyChatError(error);
+        if (_chatMessages.isEmpty) {
+          _chatMessages = <ChatboxMessage>[
+            ChatboxMessage.assistant(
+              'Không thể tải lịch sử chat. Bạn vẫn có thể nhắn tin mới.',
+            ),
+          ];
+        }
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isHydratingChatHistory = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _persistChatHistory() async {
+    final userId = (await _authService.getUserId())?.trim();
+    if (userId == null || userId.isEmpty) return;
+    try {
+      await _chatHistoryStore.writeHistory(userId, _chatMessages);
+    } catch (_) {
+      // Ignore local storage errors to avoid blocking chat interactions.
+    }
+  }
+
+  Future<void> _clearChatHistory() async {
+    final userId = (await _authService.getUserId())?.trim();
+    if (userId == null || userId.isEmpty) return;
+    try {
+      await _chatHistoryStore.clearHistory(userId);
+    } catch (_) {
+      // Ignore local clear errors. New history will overwrite stale entries.
+    }
   }
 
   void _scrollChatToBottom(ScrollController controller) {
@@ -543,19 +655,13 @@ class _DashboardScreenState extends State<DashboardScreen>
     });
   }
 
-  void _openAiChatDialog(Color textMain, Color accentColor) {
+  Future<void> _openAiChatDialog(Color textMain, Color accentColor) async {
+    await _loadChatHistoryIfNeeded();
+    if (!mounted) return;
+
     final inputController = TextEditingController();
     final scrollController = ScrollController();
-    final messages = <_LocalAiChatMessage>[
-      const _LocalAiChatMessage(
-        isUser: false,
-        text: 'Xin chao, day la cua so chat tam thoi cua tro ly AI.',
-      ),
-      _LocalAiChatMessage(
-        isUser: false,
-        text: _buildAiStatusMessage(),
-      ),
-    ];
+    var didInitialScroll = false;
 
     showDialog<void>(
       context: context,
@@ -567,21 +673,139 @@ class _DashboardScreenState extends State<DashboardScreen>
               const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
           child: StatefulBuilder(
             builder: (context, setDialogState) {
-              void sendMessage() {
-                final raw = inputController.text.trim();
-                if (raw.isEmpty) return;
+              if (!didInitialScroll && _chatMessages.isNotEmpty) {
+                didInitialScroll = true;
+                _scrollChatToBottom(scrollController);
+              }
+
+              Future<void> sendMessage({
+                String? preset,
+                bool forceContext = false,
+              }) async {
+                final raw = (preset ?? inputController.text).trim();
+                if (raw.isEmpty || _isSendingChatMessage) return;
+
+                final historyBeforeSend = List<ChatboxMessage>.from(
+                  _chatMessages,
+                );
 
                 setDialogState(() {
-                  messages.add(_LocalAiChatMessage(isUser: true, text: raw));
-                  messages.add(
-                    _LocalAiChatMessage(
-                      isUser: false,
-                      text: _buildTemporaryAiReply(raw),
-                    ),
-                  );
+                  _chatMessages = <ChatboxMessage>[
+                    ..._chatMessages,
+                    ChatboxMessage.user(raw),
+                  ];
+                  _isSendingChatMessage = true;
+                  _chatboxError = null;
                 });
 
-                inputController.clear();
+                if (preset == null) {
+                  inputController.clear();
+                }
+                _scrollChatToBottom(scrollController);
+
+                try {
+                  final token = (await _authService.getToken())?.trim();
+                  final userId = (await _authService.getUserId())?.trim();
+                  if (token == null ||
+                      token.isEmpty ||
+                      userId == null ||
+                      userId.isEmpty) {
+                    throw Exception('Không tìm thấy phiên đăng nhập hợp lệ.');
+                  }
+
+                  final reply = await _chatboxRepository.sendMessage(
+                    userId: userId,
+                    token: token,
+                    message: raw,
+                    history: historyBeforeSend,
+                    requestContext: forceContext || _isContextRequest(raw),
+                  );
+
+                  final answer = reply.answer.trim().isEmpty
+                      ? 'Trợ lý AI chưa trả lời hợp lệ, bạn thử lại nhé.'
+                      : reply.answer.trim();
+
+                  if (!mounted) return;
+                  if (!context.mounted) {
+                    setState(() {
+                      _chatMessages = <ChatboxMessage>[
+                        ..._chatMessages,
+                        ChatboxMessage.assistant(answer),
+                      ];
+                      _chatSuggestions = reply.suggestions;
+                      _chatboxUpdatedAt = DateTime.now();
+                      _chatboxError = null;
+                      _isSendingChatMessage = false;
+                    });
+                    await _persistChatHistory();
+                    return;
+                  }
+
+                  setDialogState(() {
+                    _chatMessages = <ChatboxMessage>[
+                      ..._chatMessages,
+                      ChatboxMessage.assistant(answer),
+                    ];
+                    _chatSuggestions = reply.suggestions;
+                    _chatboxUpdatedAt = DateTime.now();
+                    _chatboxError = null;
+                    _isSendingChatMessage = false;
+                  });
+
+                  await _persistChatHistory();
+                } catch (error) {
+                  if (!mounted) return;
+                  final errorMessage = _buildFriendlyChatError(error);
+
+                  if (!context.mounted) {
+                    setState(() {
+                      _chatMessages = <ChatboxMessage>[
+                        ..._chatMessages,
+                        ChatboxMessage.assistant(
+                          'Không gửi được tin nhắn: $errorMessage',
+                        ),
+                      ];
+                      _chatboxError = errorMessage;
+                      _isSendingChatMessage = false;
+                    });
+                    await _persistChatHistory();
+                    return;
+                  }
+
+                  setDialogState(() {
+                    _chatMessages = <ChatboxMessage>[
+                      ..._chatMessages,
+                      ChatboxMessage.assistant(
+                        'Không gửi được tin nhắn: $errorMessage',
+                      ),
+                    ];
+                    _chatboxError = errorMessage;
+                    _isSendingChatMessage = false;
+                  });
+
+                  await _persistChatHistory();
+                } finally {
+                  _scrollChatToBottom(scrollController);
+                }
+              }
+
+              Future<void> clearHistory() async {
+                if (_isSendingChatMessage) return;
+
+                setDialogState(() {
+                  _chatMessages = <ChatboxMessage>[
+                    ChatboxMessage.assistant(
+                      'Lịch sử chat đã được xóa.',
+                    ),
+                    ChatboxMessage.assistant(_buildAiStatusMessage()),
+                  ];
+                  _chatSuggestions = const <String>[];
+                  _chatboxError = null;
+                  _chatboxUpdatedAt = null;
+                });
+
+                await _clearChatHistory();
+                await _persistChatHistory();
                 _scrollChatToBottom(scrollController);
               }
 
@@ -612,7 +836,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'Tro ly AI (tam thoi)',
+                                'Trợ lý AI',
                                 style: TextStyle(
                                   color: textMain,
                                   fontSize: 15,
@@ -632,12 +856,122 @@ class _DashboardScreenState extends State<DashboardScreen>
                           ],
                         ),
                         const SizedBox(height: 10),
+                        if (_chatboxUpdatedAt != null) ...[
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Đồng bộ lần cuối: ${_formatChatTime(_chatboxUpdatedAt!)}',
+                              style: TextStyle(
+                                color: textMain.withOpacity(0.65),
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                        if (_chatboxError != null) ...[
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.redAccent.withOpacity(0.16),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: Colors.redAccent.withOpacity(0.35),
+                              ),
+                            ),
+                            child: Text(
+                              _chatboxError!,
+                              style: TextStyle(
+                                color: textMain,
+                                fontSize: 12,
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
+                        ],
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: _isSendingChatMessage
+                                  ? null
+                                  : () => sendMessage(
+                                        preset: 'Lấy ngữ cảnh hiện tại',
+                                        forceContext: true,
+                                      ),
+                              icon: const Icon(Icons.dataset_linked_rounded),
+                              label: const Text('Lấy ngữ cảnh'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: accentColor,
+                                side: BorderSide(
+                                  color: accentColor.withOpacity(0.55),
+                                ),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed:
+                                  _chatMessages.isEmpty ? null : clearHistory,
+                              icon: const Icon(Icons.delete_outline_rounded),
+                              label: const Text('Xóa lịch sử'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: textMain.withOpacity(0.85),
+                                side: BorderSide(
+                                  color: textMain.withOpacity(0.3),
+                                ),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (_chatSuggestions.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            height: 34,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _chatSuggestions.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 8),
+                              itemBuilder: (context, index) {
+                                final tip = _chatSuggestions[index];
+                                return ActionChip(
+                                  label: Text(
+                                    tip,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  onPressed: _isSendingChatMessage
+                                      ? null
+                                      : () => sendMessage(preset: tip),
+                                  labelStyle: TextStyle(
+                                    color: textMain,
+                                    fontSize: 12,
+                                  ),
+                                  backgroundColor:
+                                      Colors.white.withOpacity(0.1),
+                                  side: BorderSide(
+                                    color: Colors.white.withOpacity(0.2),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 8),
                         Expanded(
                           child: ListView.builder(
                             controller: scrollController,
-                            itemCount: messages.length,
+                            itemCount: _chatMessages.length,
                             itemBuilder: (context, index) {
-                              final msg = messages[index];
+                              final msg = _chatMessages[index];
                               final align = msg.isUser
                                   ? Alignment.centerRight
                                   : Alignment.centerLeft;
@@ -664,7 +998,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                                     ),
                                   ),
                                   child: Text(
-                                    msg.text,
+                                    msg.content,
                                     style: TextStyle(
                                       color: textMain,
                                       fontSize: 13.5,
@@ -685,10 +1019,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                                 textInputAction: TextInputAction.send,
                                 minLines: 1,
                                 maxLines: 3,
+                                enabled: !_isSendingChatMessage,
                                 onSubmitted: (_) => sendMessage(),
                                 style: TextStyle(color: textMain),
                                 decoration: InputDecoration(
-                                  hintText: 'Nhap tin nhan...',
+                                  hintText: 'Nhập tin nhắn...',
                                   hintStyle: TextStyle(
                                       color: textMain.withOpacity(0.6)),
                                   contentPadding: const EdgeInsets.symmetric(
@@ -718,11 +1053,21 @@ class _DashboardScreenState extends State<DashboardScreen>
                             ),
                             const SizedBox(width: 8),
                             IconButton(
-                              onPressed: sendMessage,
-                              icon: Icon(
-                                Icons.send_rounded,
-                                color: accentColor,
-                              ),
+                              onPressed:
+                                  _isSendingChatMessage ? null : sendMessage,
+                              icon: _isSendingChatMessage
+                                  ? SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: accentColor,
+                                      ),
+                                    )
+                                  : Icon(
+                                      Icons.send_rounded,
+                                      color: accentColor,
+                                    ),
                             ),
                           ],
                         ),
@@ -1435,7 +1780,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                 children: [
                   FittedBox(
                     fit: BoxFit.scaleDown,
-                    child: Text('Tro ly AI:',
+                    child: Text('Trợ lý AI:',
                         style: TextStyle(
                             color: textMain.withOpacity(0.8),
                             fontSize: 12,
@@ -1447,7 +1792,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                           color: textMain, fontSize: 14, height: 1.4)),
                   const SizedBox(height: 8),
                   Text(
-                    'Nhan de mo cua so chat tam thoi',
+                    'Nhấn để mở cửa sổ chat',
                     style: TextStyle(
                       color: accentColor,
                       fontSize: 12,
@@ -1510,7 +1855,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Flexible(
-                          child: Text('User ID: $_userIdDisplay',
+                          child: Text('IdUser: $_userIdDisplay',
                               textAlign: TextAlign.center,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -1519,7 +1864,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         ),
                         IconButton(
                           onPressed: _copyUserId,
-                          tooltip: 'Copy User ID',
+                          tooltip: 'Sao chép IdUser',
                           icon: Icon(
                             Icons.copy_rounded,
                             size: 18,
@@ -1931,16 +2276,6 @@ class _DashboardScreenState extends State<DashboardScreen>
             hasGlow: hasGlow),
         child: Container());
   }
-}
-
-class _LocalAiChatMessage {
-  const _LocalAiChatMessage({
-    required this.isUser,
-    required this.text,
-  });
-
-  final bool isUser;
-  final String text;
 }
 
 // --- CUSTOM PAINTERS ---
