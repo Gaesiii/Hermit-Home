@@ -15,6 +15,6 @@ export default function handler(req: VercelRequest, res: VercelResponse): void {
   res.status(200).json({
     success: true,
     message:
-      'Use /api/devices/{deviceId}/status, /api/devices/{deviceId}/telemetry, /api/devices/{deviceId}/override, /api/devices/{deviceId}/control, or /api/devices/{deviceId}',
+      'Use /api/devices/{deviceId}/data?type=latest|history, /api/devices/{deviceId}/action?type=control|override|alert, /api/logs, or /api/devices/{deviceId}',
   });
 }

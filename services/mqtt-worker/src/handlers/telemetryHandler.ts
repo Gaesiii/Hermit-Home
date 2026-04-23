@@ -1,5 +1,6 @@
 import { TelemetryPayload } from '@smart-terrarium/shared-types';
 import { insertTelemetry } from '../db/telemetryRepo';
+import { insertDiagnosticLog } from '../db/diagnosticLogRepo';
 import { logger } from '../utils/logger';
 
 const TELEMETRY_TOPIC_PREFIX = 'terrarium/telemetry/';
@@ -130,6 +131,17 @@ export async function handleTelemetry(
     const parsed: unknown = JSON.parse(message.toString('utf8'));
     if (!isValidTelemetryPayload(parsed)) {
       logger.warn({ topic, deviceId }, 'Dropped telemetry with invalid schema');
+      await insertDiagnosticLog({
+        deviceId,
+        userId: null,
+        source: 'mqtt-worker',
+        category: 'TELEMETRY',
+        status: 'FAIL',
+        message: '[FAIL] Telemetry payload rejected due to invalid schema.',
+        metadata: {
+          topic,
+        },
+      });
       return;
     }
 
@@ -142,10 +154,34 @@ export async function handleTelemetry(
     }
 
     await insertTelemetry(deviceId, parsed);
+    await insertDiagnosticLog({
+      deviceId,
+      userId: null,
+      source: 'mqtt-worker',
+      category: 'TELEMETRY',
+      status: 'PASS',
+      message: '[PASS] Telemetry payload persisted from Edge Device.',
+      metadata: {
+        topic,
+        sensor_fault: parsed.sensor_fault,
+      },
+    });
   } catch (error: unknown) {
     logger.error(
       { err: error, topic, payload: message.toString('utf8') },
       'Failed to parse telemetry payload'
     );
+    await insertDiagnosticLog({
+      deviceId,
+      userId: null,
+      source: 'mqtt-worker',
+      category: 'TELEMETRY',
+      status: 'FAIL',
+      message: '[FAIL] Telemetry ingestion failed during parsing.',
+      metadata: {
+        topic,
+        error: (error as Error).message,
+      },
+    });
   }
 }

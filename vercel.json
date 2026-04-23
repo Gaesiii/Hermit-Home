@@ -27,55 +27,88 @@
     {
       "src": "services/api/api/**/*.ts",
       "use": "@vercel/node"
+    },
+    {
+      "src": "services/api/public/**/*",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
     {
       "src": "/reset-password",
-
-
-      "dest": "/services/api/api/users/reset-password-link.ts"
+      "dest": "/services/api/api/auth/index.ts?action=reset-link"
     },
     {
       "src": "/reset-password/",
-      "dest": "/services/api/api/users/reset-password-link.ts"
-
+      "dest": "/services/api/api/auth/index.ts?action=reset-link"
+    },
+    {
+      "src": "/api/auth",
+      "dest": "/services/api/api/auth/index.ts"
     },
     {
       "src": "/api/users/forgot-password",
-      "dest": "/services/api/api/users/password-reset.ts?mode=forgot"
-    },
-    {
-      "src": "/api/users/validate-reset-token",
-      "dest": "/services/api/api/users/reset-password.ts"
+      "dest": "/services/api/api/auth/index.ts?action=forgot-password"
     },
     {
       "src": "/api/users/reset-password",
-      "dest": "/services/api/api/users/password-reset.ts?mode=reset"
+      "dest": "/services/api/api/auth/index.ts?action=reset-password"
+    },
+    {
+      "src": "/api/users/validate-reset-token",
+      "dest": "/services/api/api/auth/index.ts?action=validate-reset-token"
+    },
+    {
+      "src": "/api/users/password-reset",
+      "dest": "/services/api/api/auth/index.ts?action=password-reset"
+    },
+    {
+      "src": "/api/users/reset-password-link",
+      "dest": "/services/api/api/auth/index.ts?action=reset-link"
     },
     {
       "src": "/api/users/login",
-      "dest": "/services/api/api/users/login.ts"
+      "dest": "/services/api/api/auth/index.ts?action=login"
     },
     {
       "src": "/api/users/register",
-      "dest": "/services/api/api/users/register.ts"
+      "dest": "/services/api/api/auth/index.ts?action=register"
+    },
+    {
+      "src": "/api/agent/control/cycle",
+      "dest": "/services/api/api/agent/control/cycle.ts"
+    },
+    {
+      "src": "/api/devices/([^/]+)/data",
+      "dest": "/services/api/api/devices/[deviceId]/data.ts?deviceId=$1"
     },
     {
       "src": "/api/devices/([^/]+)/status",
-      "dest": "/services/api/api/devices/[deviceId]/status.ts?deviceId=$1"
-    },
-    {
-      "src": "/api/devices/([^/]+)/override",
-      "dest": "/services/api/api/devices/[deviceId]/override.ts?deviceId=$1"
-    },
-    {
-      "src": "/api/devices/([^/]+)/control",
-      "dest": "/services/api/api/devices/[deviceId]/control.ts?deviceId=$1"
+      "dest": "/services/api/api/devices/[deviceId]/data.ts?deviceId=$1&type=latest"
     },
     {
       "src": "/api/devices/([^/]+)/telemetry",
-      "dest": "/services/api/api/devices/[deviceId]/telemetry.ts?deviceId=$1"
+      "dest": "/services/api/api/devices/[deviceId]/data.ts?deviceId=$1&type=history"
+    },
+    {
+      "src": "/api/devices/([^/]+)/action",
+      "dest": "/services/api/api/devices/[deviceId]/action.ts?deviceId=$1"
+    },
+    {
+      "src": "/api/devices/([^/]+)/chatbox",
+      "dest": "/services/api/api/devices/[deviceId]/chatbox.ts?deviceId=$1"
+    },
+    {
+      "src": "/api/devices/([^/]+)/override",
+      "dest": "/services/api/api/devices/[deviceId]/action.ts?deviceId=$1&type=override"
+    },
+    {
+      "src": "/api/devices/([^/]+)/control",
+      "dest": "/services/api/api/devices/[deviceId]/action.ts?deviceId=$1&type=control"
+    },
+    {
+      "src": "/api/devices/([^/]+)/alerts",
+      "dest": "/services/api/api/devices/[deviceId]/action.ts?deviceId=$1&type=alert"
     },
     {
       "src": "/api/devices/schedules",
@@ -90,8 +123,16 @@
       "dest": "/services/api/api/devices/index.ts"
     },
     {
-      "src": "/api/auth/(.*)",
-      "dest": "/services/api/api/auth/[...nextauth].ts"
+      "src": "/api/logs",
+      "dest": "/services/api/api/logs.ts"
+    },
+    {
+      "src": "/images/(.*)",
+      "dest": "/services/api/public/images/$1"
+    },
+    {
+      "src": "/",
+      "dest": "/services/api/public/index.html"
     }
   ]
 }

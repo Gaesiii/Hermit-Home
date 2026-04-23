@@ -1,68 +1,8 @@
-import { VercelRequest, VercelResponse } from '@vercel/node';
-import { publishCommand } from '../../../lib/mqttPublisher';
-import { CommandPayload } from '@smart-terrarium/shared-types';
-import { verifyAuth } from '../../../lib/authMiddleware';
-import { MIST_SAFETY_LOCK_ENABLED, sanitizeCommandPayload } from '../../../lib/mistSafety';
-import { handleApiPreflight, methodNotAllowed } from '../../../lib/http';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import actionHandler from './action';
+import { patchQuery } from '../../../lib/legacyRouteProxy';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const allowedMethods = ['POST'] as const;
-  if (handleApiPreflight(req, res, allowedMethods)) {
-    return;
-  }
-
-  if (req.method !== 'POST') {
-    methodNotAllowed(req, res, allowedMethods);
-    return;
-  }
-
-  // ----------------------------------------------------------------
-  //  Auth gate — SEV-1 fix
-  //  verifyAuth() returns null and writes the 401 response itself.
-  //  We must return immediately on null so the rest of the handler
-  //  never executes with an unauthenticated request.
-  // ----------------------------------------------------------------
-  const uid = await verifyAuth(req, res);
-  if (uid === null) return;
-
-  const { deviceId } = req.query;
-  const command = req.body as CommandPayload;
-
-  if (!command || typeof command !== 'object' || Array.isArray(command)) {
-    return res.status(400).json({ error: 'Request body must be a JSON object' });
-  }
-
-  const safeCommand = sanitizeCommandPayload(command);
-  const requestedMistOn = command?.devices?.mist === true;
-
-  if (!deviceId || typeof deviceId !== 'string') {
-    return res.status(400).json({ error: 'Device ID is required' });
-  }
-
-  // ----------------------------------------------------------------
-  //  Ownership check
-  //  The authenticated uid must match the deviceId being commanded.
-  //  This prevents a legitimate user from sending relay commands
-  //  to another user's device — even with a valid token.
-  // ----------------------------------------------------------------
-  if (uid !== deviceId) {
-    return res.status(403).json({
-      error: 'Forbidden',
-      message: 'You do not have permission to control this device.',
-    });
-  }
-
-  try {
-    await publishCommand(deviceId, safeCommand);
-
-    return res.status(200).json({
-      success: true,
-      device: deviceId,
-      message: 'Override command sent',
-      mist_locked_off: MIST_SAFETY_LOCK_ENABLED && requestedMistOn,
-    });
-  } catch (error) {
-    console.error('MQTT Error:', error);
-    return res.status(500).json({ error: 'Failed to communicate with device' });
-  }
+export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+  patchQuery(req, { type: 'override' });
+  await actionHandler(req, res);
 }
