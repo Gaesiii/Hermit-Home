@@ -29,7 +29,7 @@
       "use": "@vercel/node"
     },
     {
-      "src": "services/api/public/**/*.html",
+      "src": "services/api/public/**/*",
       "use": "@vercel/static"
     }
   ],
@@ -109,6 +109,10 @@
     {
       "src": "/api/logs",
       "dest": "/services/api/api/logs.ts"
+    },
+    {
+      "src": "/images/(.*)",
+      "dest": "/services/api/public/images/$1"
     },
     {
       "src": "/",
