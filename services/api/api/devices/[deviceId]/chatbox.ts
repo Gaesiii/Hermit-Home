@@ -101,6 +101,12 @@ type OpenRouterMessage = {
   content: string;
 };
 
+type OpenRouterCallResult = {
+  content: string;
+  model: string;
+  attemptedModels: string[];
+};
+
 function readQueryValue(value: string | string[] | undefined): string | null {
   if (typeof value === 'string') {
     return value;
@@ -127,6 +133,31 @@ function parseTemperature(raw: string | undefined, fallback: number): number {
   const parsed = Number.parseFloat(raw);
   if (!Number.isFinite(parsed)) return fallback;
   return clamp(parsed, 0, 1);
+}
+
+function parseModelCandidates(raw: string): string[] {
+  if (!raw) return [];
+  const candidates = raw
+    .split(',')
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+  return [...new Set(candidates)];
+}
+
+function resolveOpenRouterModels(): string[] {
+  const explicitCsv = (process.env.OPENROUTER_CHAT_MODELS || '').trim();
+  const preferredModel = (process.env.OPENROUTER_CHAT_MODEL || '').trim();
+  const sharedModel = (process.env.OPENROUTER_MODEL || '').trim();
+  const fallbackModel = 'google/gemma-3-27b-it:free';
+
+  const ordered = [
+    ...parseModelCandidates(explicitCsv),
+    ...parseModelCandidates(preferredModel),
+    ...parseModelCandidates(sharedModel),
+    fallbackModel,
+  ];
+
+  return [...new Set(ordered)];
 }
 
 function asNumber(value: unknown): number | null {
@@ -589,13 +620,17 @@ function normalizeModelContent(content: unknown): string | null {
   return joined.length > 0 ? joined : null;
 }
 
-async function callOpenRouter(messages: OpenRouterMessage[]): Promise<string> {
+async function callOpenRouter(messages: OpenRouterMessage[]): Promise<OpenRouterCallResult> {
   const apiKey = (process.env.OPENROUTER_API_KEY || '').trim();
   if (!apiKey) {
     throw new Error('OPENROUTER_API_KEY is not configured.');
   }
 
-  const model = (process.env.OPENROUTER_CHAT_MODEL || process.env.OPENROUTER_MODEL || 'google/gemma-3-27b-it:free').trim();
+  const models = resolveOpenRouterModels();
+  if (models.length === 0) {
+    throw new Error('No OpenRouter models are configured.');
+  }
+
   const baseUrl = (process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1').trim().replace(/\/+$/, '');
   const httpReferer = (process.env.OPENROUTER_HTTP_REFERER || '').trim();
   const appName = (process.env.OPENROUTER_APP_NAME || 'Hermit Home Chatbox').trim();
@@ -614,56 +649,71 @@ async function callOpenRouter(messages: OpenRouterMessage[]): Promise<string> {
   if (httpReferer) headers['HTTP-Referer'] = httpReferer;
   if (appName) headers['X-Title'] = appName;
 
-  const requestBody: Record<string, unknown> = {
-    model,
-    messages,
-    temperature,
-    max_tokens: maxTokens,
-    response_format: { type: 'json_object' },
-  };
+  const modelErrors: string[] = [];
+  for (let index = 0; index < models.length; index += 1) {
+    const model = models[index];
+    const requestBody: Record<string, unknown> = {
+      model,
+      messages,
+      temperature,
+      max_tokens: maxTokens,
+      response_format: { type: 'json_object' },
+    };
 
-  let response = await fetch(endpoint, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(requestBody),
-  });
-
-  if (!response.ok) {
-    requestBody.response_format = undefined;
-    response = await fetch(endpoint, {
+    let response = await fetch(endpoint, {
       method: 'POST',
       headers,
       body: JSON.stringify(requestBody),
     });
+
+    if (!response.ok) {
+      requestBody.response_format = undefined;
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(requestBody),
+      });
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      modelErrors.push(`${model}: HTTP ${response.status} ${errorText.slice(0, 220)}`);
+      continue;
+    }
+
+    try {
+      const json = (await response.json()) as Record<string, unknown>;
+      const choices = json.choices;
+      if (!Array.isArray(choices) || choices.length === 0) {
+        throw new Error('OpenRouter returned no choices.');
+      }
+
+      const firstChoice = choices[0];
+      if (!firstChoice || typeof firstChoice !== 'object' || Array.isArray(firstChoice)) {
+        throw new Error('OpenRouter first choice is invalid.');
+      }
+
+      const message = (firstChoice as Record<string, unknown>).message;
+      if (!message || typeof message !== 'object' || Array.isArray(message)) {
+        throw new Error('OpenRouter message payload is invalid.');
+      }
+
+      const content = normalizeModelContent((message as Record<string, unknown>).content);
+      if (!content) {
+        throw new Error('OpenRouter content is empty.');
+      }
+
+      return {
+        content,
+        model,
+        attemptedModels: models.slice(0, index + 1),
+      };
+    } catch (error: unknown) {
+      modelErrors.push(`${model}: ${error instanceof Error ? error.message : 'response parse error'}`);
+    }
   }
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OpenRouter request failed (${response.status}): ${errorText.slice(0, 300)}`);
-  }
-
-  const json = (await response.json()) as Record<string, unknown>;
-  const choices = json.choices;
-  if (!Array.isArray(choices) || choices.length === 0) {
-    throw new Error('OpenRouter returned no choices.');
-  }
-
-  const firstChoice = choices[0];
-  if (!firstChoice || typeof firstChoice !== 'object' || Array.isArray(firstChoice)) {
-    throw new Error('OpenRouter first choice is invalid.');
-  }
-
-  const message = (firstChoice as Record<string, unknown>).message;
-  if (!message || typeof message !== 'object' || Array.isArray(message)) {
-    throw new Error('OpenRouter message payload is invalid.');
-  }
-
-  const content = normalizeModelContent((message as Record<string, unknown>).content);
-  if (!content) {
-    throw new Error('OpenRouter content is empty.');
-  }
-
-  return content;
+  throw new Error(`OpenRouter request failed for all models. ${modelErrors.join(' | ')}`);
 }
 
 function buildSystemPrompt(): string {
@@ -724,9 +774,11 @@ async function handleSuggestionGet(
 
     let answer = 'Đây là các gợi ý dựa trên telemetry hiện tại.';
     let suggestions = fallbackSuggestions;
+    let usedModel: string | null = null;
+    let attemptedModels: string[] = [];
 
     try {
-      const rawText = await callOpenRouter([
+      const modelResult = await callOpenRouter([
         { role: 'system', content: buildSystemPrompt() },
         {
           role: 'user',
@@ -738,10 +790,15 @@ async function handleSuggestionGet(
           }),
         },
       ]);
-      const parsed = extractJsonObject(rawText);
+      usedModel = modelResult.model;
+      attemptedModels = modelResult.attemptedModels;
+      const parsed = extractJsonObject(modelResult.content);
       answer = sanitizeAnswer(parsed?.answer, answer);
       suggestions = sanitizeSuggestions(parsed?.suggestions, fallbackSuggestions);
     } catch (modelError: unknown) {
+      if (attemptedModels.length === 0) {
+        attemptedModels = resolveOpenRouterModels();
+      }
       await insertDiagnosticLog({
         deviceId,
         userId: req.user.userId,
@@ -753,6 +810,8 @@ async function handleSuggestionGet(
           endpoint: '/api/devices/[deviceId]/chatbox',
           method: 'GET',
           error: modelError instanceof Error ? modelError.message : 'unknown error',
+          modelCandidates: resolveOpenRouterModels(),
+          attemptedModels,
         },
       });
     }
@@ -768,6 +827,7 @@ async function handleSuggestionGet(
         endpoint: '/api/devices/[deviceId]/chatbox',
         method: 'GET',
         suggestionCount: suggestions.length,
+        model: usedModel ?? 'fallback',
       },
     });
 
@@ -778,6 +838,7 @@ async function handleSuggestionGet(
       answer,
       suggestions,
       summary,
+      model: usedModel,
     });
   } catch (error: unknown) {
     await insertDiagnosticLog({
@@ -858,13 +919,20 @@ async function handleChatPost(
 
     let answer = fallbackAnswer;
     let suggestions = fallbackSuggestions;
+    let usedModel: string | null = null;
+    let attemptedModels: string[] = [];
 
     try {
-      const rawText = await callOpenRouter(messages);
-      const parsed = extractJsonObject(rawText);
+      const modelResult = await callOpenRouter(messages);
+      usedModel = modelResult.model;
+      attemptedModels = modelResult.attemptedModels;
+      const parsed = extractJsonObject(modelResult.content);
       answer = sanitizeAnswer(parsed?.answer, fallbackAnswer);
       suggestions = sanitizeSuggestions(parsed?.suggestions, fallbackSuggestions);
     } catch (modelError: unknown) {
+      if (attemptedModels.length === 0) {
+        attemptedModels = resolveOpenRouterModels();
+      }
       await insertDiagnosticLog({
         deviceId,
         userId: req.user.userId,
@@ -876,6 +944,8 @@ async function handleChatPost(
           endpoint: '/api/devices/[deviceId]/chatbox',
           method: 'POST',
           error: modelError instanceof Error ? modelError.message : 'unknown error',
+          modelCandidates: resolveOpenRouterModels(),
+          attemptedModels,
         },
       });
     }
@@ -893,6 +963,7 @@ async function handleChatPost(
         questionLength: question.length,
         mode: requestContext ? 'context' : 'chat',
         suggestionCount: suggestions.length,
+        model: usedModel ?? 'fallback',
       },
     });
 
@@ -904,6 +975,7 @@ async function handleChatPost(
       suggestions,
       summary,
       historyContext,
+      model: usedModel,
     };
 
     if (requestContext) {
