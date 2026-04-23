@@ -1,0 +1,12 @@
+{
+  "startedAt": "2026-04-21T05:04:56.663Z",
+  "topic": "terrarium/confirm/67c6fd9a9acfdbc1d05c22b1",
+  "apiCommandStatus": 200,
+  "ackReceived": false,
+  "ackPayload": null,
+  "errors": [
+    "ack_timeout_20s"
+  ],
+  "apiCommandBody": "{\"success\":true,\"device\":\"67c6fd9a9acfdbc1d05c22b1\",\"message\":\"Override command sent\",\"mist_locked_off\":false}",
+  "finishedAt": "2026-04-21T05:05:18.801Z"
+}

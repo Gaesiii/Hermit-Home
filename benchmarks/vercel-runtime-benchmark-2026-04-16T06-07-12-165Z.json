@@ -1,0 +1,1072 @@
+{
+  "generatedAt": "2026-04-16T06:07:12.165Z",
+  "startedAt": "2026-04-16T06:04:01.317Z",
+  "finishedAt": "2026-04-16T06:07:12.165Z",
+  "baseUrl": "https://hermit-home.vercel.app",
+  "benchmarkContext": {
+    "email": "bench-api-1776319441319-88ad63@example.com",
+    "userId": "69e07bd3692ad4372b6e74ce"
+  },
+  "config": {
+    "api": {
+      "durationSeconds": 8,
+      "connectionsDefault": 10,
+      "connectionsHeavy": 5,
+      "dynamicRegisterRequests": 20,
+      "dynamicRegisterConcurrency": 2
+    },
+    "db": {
+      "iterationsPerOperation": 80,
+      "warmupRounds": 5
+    }
+  },
+  "apiResults": [
+    {
+      "kind": "manual-load",
+      "name": "devices_index_get",
+      "method": "GET",
+      "path": "/api/devices",
+      "url": "https://hermit-home.vercel.app/api/devices",
+      "startedAt": "2026-04-16T06:04:03.536Z",
+      "finishedAt": "2026-04-16T06:04:11.803Z",
+      "config": {
+        "durationSeconds": 8,
+        "connections": 10
+      },
+      "result": {
+        "totalRequests": 294,
+        "requestsPerSecAvg": 35.56308213378493,
+        "throughputBytesPerSecAvg": 6863.674851820491,
+        "latencyMs": {
+          "min": 243.6259000000009,
+          "avg": 276.4678887755101,
+          "p50": 271.3101999999999,
+          "p95": 329.16319999999905,
+          "p99": 369.5658999999996,
+          "max": 401.60530000000017
+        },
+        "errors": 0,
+        "timeouts": 0,
+        "non2xx": 0,
+        "non2xxRate": 0,
+        "statusCodeStats": {
+          "200": {
+            "count": 294
+          }
+        },
+        "failedSamples": []
+      }
+    },
+    {
+      "kind": "manual-load",
+      "name": "devices_schedules_get",
+      "method": "GET",
+      "path": "/api/devices/schedules",
+      "url": "https://hermit-home.vercel.app/api/devices/schedules",
+      "startedAt": "2026-04-16T06:04:11.804Z",
+      "finishedAt": "2026-04-16T06:04:20.074Z",
+      "config": {
+        "durationSeconds": 8,
+        "connections": 10
+      },
+      "result": {
+        "totalRequests": 299,
+        "requestsPerSecAvg": 36.15477629987908,
+        "throughputBytesPerSecAvg": 3904.7158403869407,
+        "latencyMs": {
+          "min": 244.3633000000009,
+          "avg": 272.62609297658867,
+          "p50": 270.3644999999997,
+          "p95": 302.0123999999996,
+          "p99": 348.6296999999995,
+          "max": 619.2394000000004
+        },
+        "errors": 0,
+        "timeouts": 0,
+        "non2xx": 0,
+        "non2xxRate": 0,
+        "statusCodeStats": {
+          "200": {
+            "count": 299
+          }
+        },
+        "failedSamples": []
+      }
+    },
+    {
+      "kind": "manual-load",
+      "name": "device_get",
+      "method": "GET",
+      "path": "/api/devices/69e07bd3692ad4372b6e74ce",
+      "url": "https://hermit-home.vercel.app/api/devices/69e07bd3692ad4372b6e74ce",
+      "startedAt": "2026-04-16T06:04:20.074Z",
+      "finishedAt": "2026-04-16T06:04:30.621Z",
+      "config": {
+        "durationSeconds": 8,
+        "connections": 10
+      },
+      "result": {
+        "totalRequests": 93,
+        "requestsPerSecAvg": 8.81767327202048,
+        "throughputBytesPerSecAvg": 246.89485161657342,
+        "latencyMs": {
+          "min": 444.86989999999787,
+          "avg": 935.9950172043003,
+          "p50": 471.04859999999826,
+          "p95": 3423.3773999999976,
+          "p99": 3492.446899999999,
+          "max": 3492.446899999999
+        },
+        "errors": 0,
+        "timeouts": 0,
+        "non2xx": 93,
+        "non2xxRate": 1,
+        "statusCodeStats": {
+          "404": {
+            "count": 93
+          }
+        },
+        "failedSamples": [
+          {
+            "status": 404,
+            "body": {
+              "error": "Device not found"
+            }
+          },
+          {
+            "status": 404,
+            "body": {
+              "error": "Device not found"
+            }
+          },
+          {
+            "status": 404,
+            "body": {
+              "error": "Device not found"
+            }
+          },
+          {
+            "status": 404,
+            "body": {
+              "error": "Device not found"
+            }
+          },
+          {
+            "status": 404,
+            "body": {
+              "error": "Device not found"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "manual-load",
+      "name": "device_status_get",
+      "method": "GET",
+      "path": "/api/devices/69e07bd3692ad4372b6e74ce/status",
+      "url": "https://hermit-home.vercel.app/api/devices/69e07bd3692ad4372b6e74ce/status",
+      "startedAt": "2026-04-16T06:04:30.621Z",
+      "finishedAt": "2026-04-16T06:04:39.139Z",
+      "config": {
+        "durationSeconds": 8,
+        "connections": 10
+      },
+      "result": {
+        "totalRequests": 86,
+        "requestsPerSecAvg": 10.096266729279172,
+        "throughputBytesPerSecAvg": 413.9469359004461,
+        "latencyMs": {
+          "min": 445.80199999999604,
+          "avg": 958.6197616279065,
+          "p50": 476.7363000000041,
+          "p95": 3233.7505999999994,
+          "p99": 3299.6640000000007,
+          "max": 3299.6640000000007
+        },
+        "errors": 0,
+        "timeouts": 0,
+        "non2xx": 86,
+        "non2xxRate": 1,
+        "statusCodeStats": {
+          "404": {
+            "count": 86
+          }
+        },
+        "failedSamples": [
+          {
+            "status": 404,
+            "body": {
+              "error": "No data found for this device"
+            }
+          },
+          {
+            "status": 404,
+            "body": {
+              "error": "No data found for this device"
+            }
+          },
+          {
+            "status": 404,
+            "body": {
+              "error": "No data found for this device"
+            }
+          },
+          {
+            "status": 404,
+            "body": {
+              "error": "No data found for this device"
+            }
+          },
+          {
+            "status": 404,
+            "body": {
+              "error": "No data found for this device"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "manual-load",
+      "name": "device_telemetry_get",
+      "method": "GET",
+      "path": "/api/devices/69e07bd3692ad4372b6e74ce/telemetry?limit=30",
+      "url": "https://hermit-home.vercel.app/api/devices/69e07bd3692ad4372b6e74ce/telemetry?limit=30",
+      "startedAt": "2026-04-16T06:04:39.139Z",
+      "finishedAt": "2026-04-16T06:04:49.648Z",
+      "config": {
+        "durationSeconds": 8,
+        "connections": 10
+      },
+      "result": {
+        "totalRequests": 91,
+        "requestsPerSecAvg": 8.659244457131981,
+        "throughputBytesPerSecAvg": 554.1916452564468,
+        "latencyMs": {
+          "min": 454.50930000000517,
+          "avg": 1010.4076318681316,
+          "p50": 488.3870999999999,
+          "p95": 3070.6526000000013,
+          "p99": 3844.002099999998,
+          "max": 3844.002099999998
+        },
+        "errors": 0,
+        "timeouts": 0,
+        "non2xx": 0,
+        "non2xxRate": 0,
+        "statusCodeStats": {
+          "200": {
+            "count": 91
+          }
+        },
+        "failedSamples": []
+      }
+    },
+    {
+      "kind": "manual-load",
+      "name": "device_control_get",
+      "method": "GET",
+      "path": "/api/devices/69e07bd3692ad4372b6e74ce/control?limit=20",
+      "url": "https://hermit-home.vercel.app/api/devices/69e07bd3692ad4372b6e74ce/control?limit=20",
+      "startedAt": "2026-04-16T06:04:49.649Z",
+      "finishedAt": "2026-04-16T06:04:59.466Z",
+      "config": {
+        "durationSeconds": 8,
+        "connections": 10
+      },
+      "result": {
+        "totalRequests": 96,
+        "requestsPerSecAvg": 9.77895487419782,
+        "throughputBytesPerSecAvg": 508.50565345828664,
+        "latencyMs": {
+          "min": 453.7155999999959,
+          "avg": 880.7143333333335,
+          "p50": 509.99950000000536,
+          "p95": 2532.5944999999992,
+          "p99": 3375.411899999999,
+          "max": 3375.411899999999
+        },
+        "errors": 0,
+        "timeouts": 0,
+        "non2xx": 0,
+        "non2xxRate": 0,
+        "statusCodeStats": {
+          "200": {
+            "count": 96
+          }
+        },
+        "failedSamples": []
+      }
+    },
+    {
+      "kind": "manual-load",
+      "name": "device_patch",
+      "method": "PATCH",
+      "path": "/api/devices/69e07bd3692ad4372b6e74ce",
+      "url": "https://hermit-home.vercel.app/api/devices/69e07bd3692ad4372b6e74ce",
+      "startedAt": "2026-04-16T06:04:59.466Z",
+      "finishedAt": "2026-04-16T06:05:08.501Z",
+      "config": {
+        "durationSeconds": 8,
+        "connections": 5
+      },
+      "result": {
+        "totalRequests": 63,
+        "requestsPerSecAvg": 6.972883231876038,
+        "throughputBytesPerSecAvg": 1554.9529607083564,
+        "latencyMs": {
+          "min": 455.83050000000367,
+          "avg": 685.3892539682538,
+          "p50": 472.00359999999637,
+          "p95": 1904.419999999991,
+          "p99": 2952.420299999998,
+          "max": 2952.420299999998
+        },
+        "errors": 0,
+        "timeouts": 0,
+        "non2xx": 0,
+        "non2xxRate": 0,
+        "statusCodeStats": {
+          "200": {
+            "count": 63
+          }
+        },
+        "failedSamples": []
+      }
+    },
+    {
+      "kind": "manual-load",
+      "name": "device_override_post",
+      "method": "POST",
+      "path": "/api/devices/69e07bd3692ad4372b6e74ce/override",
+      "url": "https://hermit-home.vercel.app/api/devices/69e07bd3692ad4372b6e74ce/override",
+      "startedAt": "2026-04-16T06:05:08.501Z",
+      "finishedAt": "2026-04-16T06:05:16.689Z",
+      "config": {
+        "durationSeconds": 8,
+        "connections": 5
+      },
+      "result": {
+        "totalRequests": 131,
+        "requestsPerSecAvg": 15.999022960429896,
+        "throughputBytesPerSecAvg": 719.9560332193454,
+        "latencyMs": {
+          "min": 257.38469999999506,
+          "avg": 309.90116488549637,
+          "p50": 276.4742000000115,
+          "p95": 379.77880000000005,
+          "p99": 1159.652500000011,
+          "max": 1165.6940999999933
+        },
+        "errors": 0,
+        "timeouts": 0,
+        "non2xx": 131,
+        "non2xxRate": 1,
+        "statusCodeStats": {
+          "500": {
+            "count": 131
+          }
+        },
+        "failedSamples": [
+          {
+            "status": 500,
+            "body": {
+              "error": "Failed to communicate with device"
+            }
+          },
+          {
+            "status": 500,
+            "body": {
+              "error": "Failed to communicate with device"
+            }
+          },
+          {
+            "status": 500,
+            "body": {
+              "error": "Failed to communicate with device"
+            }
+          },
+          {
+            "status": 500,
+            "body": {
+              "error": "Failed to communicate with device"
+            }
+          },
+          {
+            "status": 500,
+            "body": {
+              "error": "Failed to communicate with device"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "manual-load",
+      "name": "device_control_post",
+      "method": "POST",
+      "path": "/api/devices/69e07bd3692ad4372b6e74ce/control",
+      "url": "https://hermit-home.vercel.app/api/devices/69e07bd3692ad4372b6e74ce/control",
+      "startedAt": "2026-04-16T06:05:16.689Z",
+      "finishedAt": "2026-04-16T06:05:24.930Z",
+      "config": {
+        "durationSeconds": 8,
+        "connections": 5
+      },
+      "result": {
+        "totalRequests": 143,
+        "requestsPerSecAvg": 17.352263074869555,
+        "throughputBytesPerSecAvg": 1474.9423613639121,
+        "latencyMs": {
+          "min": 249.58610000000044,
+          "avg": 283.9469013986018,
+          "p50": 276.4013999999879,
+          "p95": 355.6596000000136,
+          "p99": 462.6856000000116,
+          "max": 487.66429999998945
+        },
+        "errors": 0,
+        "timeouts": 0,
+        "non2xx": 143,
+        "non2xxRate": 1,
+        "statusCodeStats": {
+          "502": {
+            "count": 143
+          }
+        },
+        "failedSamples": [
+          {
+            "status": 502,
+            "body": {
+              "error": "Failed to publish command to the device. The relay state has not changed."
+            }
+          },
+          {
+            "status": 502,
+            "body": {
+              "error": "Failed to publish command to the device. The relay state has not changed."
+            }
+          },
+          {
+            "status": 502,
+            "body": {
+              "error": "Failed to publish command to the device. The relay state has not changed."
+            }
+          },
+          {
+            "status": 502,
+            "body": {
+              "error": "Failed to publish command to the device. The relay state has not changed."
+            }
+          },
+          {
+            "status": 502,
+            "body": {
+              "error": "Failed to publish command to the device. The relay state has not changed."
+            }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "manual-load",
+      "name": "users_login_post",
+      "method": "POST",
+      "path": "/api/users/login",
+      "url": "https://hermit-home.vercel.app/api/users/login",
+      "startedAt": "2026-04-16T06:05:24.930Z",
+      "finishedAt": "2026-04-16T06:05:33.698Z",
+      "config": {
+        "durationSeconds": 8,
+        "connections": 5
+      },
+      "result": {
+        "totalRequests": 30,
+        "requestsPerSecAvg": 3.421532846715328,
+        "throughputBytesPerSecAvg": 1344.662408759124,
+        "latencyMs": {
+          "min": 818.0822999999946,
+          "avg": 1439.5660366666664,
+          "p50": 1064.2883000000002,
+          "p95": 2686.967300000004,
+          "p99": 3226.0332000000053,
+          "max": 3226.0332000000053
+        },
+        "errors": 0,
+        "timeouts": 0,
+        "non2xx": 0,
+        "non2xxRate": 0,
+        "statusCodeStats": {
+          "200": {
+            "count": 30
+          }
+        },
+        "failedSamples": []
+      }
+    },
+    {
+      "kind": "manual-load",
+      "name": "users_forgot_password_post",
+      "method": "POST",
+      "path": "/api/users/forgot-password",
+      "url": "https://hermit-home.vercel.app/api/users/forgot-password",
+      "startedAt": "2026-04-16T06:05:33.698Z",
+      "finishedAt": "2026-04-16T06:05:42.525Z",
+      "config": {
+        "durationSeconds": 8,
+        "connections": 5
+      },
+      "result": {
+        "totalRequests": 62,
+        "requestsPerSecAvg": 7.023903931120426,
+        "throughputBytesPerSecAvg": 618.1035459385974,
+        "latencyMs": {
+          "min": 446.7853000000032,
+          "avg": 681.6847258064511,
+          "p50": 476.9271000000008,
+          "p95": 1769.3559000000096,
+          "p99": 2883.5602999999974,
+          "max": 2883.5602999999974
+        },
+        "errors": 0,
+        "timeouts": 0,
+        "non2xx": 0,
+        "non2xxRate": 0,
+        "statusCodeStats": {
+          "200": {
+            "count": 62
+          }
+        },
+        "failedSamples": []
+      }
+    },
+    {
+      "kind": "manual-load",
+      "name": "users_reset_password_invalid_post",
+      "method": "POST",
+      "path": "/api/users/reset-password",
+      "url": "https://hermit-home.vercel.app/api/users/reset-password",
+      "startedAt": "2026-04-16T06:05:42.525Z",
+      "finishedAt": "2026-04-16T06:05:50.895Z",
+      "config": {
+        "durationSeconds": 8,
+        "connections": 5
+      },
+      "result": {
+        "totalRequests": 60,
+        "requestsPerSecAvg": 7.168458781362008,
+        "throughputBytesPerSecAvg": 308.24372759856635,
+        "latencyMs": {
+          "min": 444.82540000000154,
+          "avg": 680.1653950000007,
+          "p50": 464.83660000000964,
+          "p95": 1890.189400000003,
+          "p99": 2876.4121000000014,
+          "max": 2876.4121000000014
+        },
+        "errors": 0,
+        "timeouts": 0,
+        "non2xx": 60,
+        "non2xxRate": 1,
+        "statusCodeStats": {
+          "400": {
+            "count": 60
+          }
+        },
+        "failedSamples": [
+          {
+            "status": 400,
+            "body": {
+              "error": "Invalid or expired reset token."
+            }
+          },
+          {
+            "status": 400,
+            "body": {
+              "error": "Invalid or expired reset token."
+            }
+          },
+          {
+            "status": 400,
+            "body": {
+              "error": "Invalid or expired reset token."
+            }
+          },
+          {
+            "status": 400,
+            "body": {
+              "error": "Invalid or expired reset token."
+            }
+          },
+          {
+            "status": 400,
+            "body": {
+              "error": "Invalid or expired reset token."
+            }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "manual-load",
+      "name": "reset_password_link_get",
+      "method": "GET",
+      "path": "/reset-password?token=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "url": "https://hermit-home.vercel.app/reset-password?token=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "startedAt": "2026-04-16T06:05:50.896Z",
+      "finishedAt": "2026-04-16T06:06:00.370Z",
+      "config": {
+        "durationSeconds": 8,
+        "connections": 5
+      },
+      "result": {
+        "totalRequests": 68,
+        "requestsPerSecAvg": 7.177538526493561,
+        "throughputBytesPerSecAvg": 0,
+        "latencyMs": {
+          "min": 447.81449999999313,
+          "avg": 648.8479955882358,
+          "p50": 467.9137999999948,
+          "p95": 1769.3145999999979,
+          "p99": 2785.1313999999984,
+          "max": 2785.1313999999984
+        },
+        "errors": 68,
+        "timeouts": 0,
+        "non2xx": 0,
+        "non2xxRate": 0,
+        "statusCodeStats": {},
+        "failedSamples": [
+          {
+            "status": "FETCH_ERROR",
+            "body": "fetch failed"
+          },
+          {
+            "status": "FETCH_ERROR",
+            "body": "fetch failed"
+          },
+          {
+            "status": "FETCH_ERROR",
+            "body": "fetch failed"
+          },
+          {
+            "status": "FETCH_ERROR",
+            "body": "fetch failed"
+          },
+          {
+            "status": "FETCH_ERROR",
+            "body": "fetch failed"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "manual-load",
+      "name": "auth_placeholder_get",
+      "method": "GET",
+      "path": "/api/auth/session",
+      "url": "https://hermit-home.vercel.app/api/auth/session",
+      "startedAt": "2026-04-16T06:06:00.370Z",
+      "finishedAt": "2026-04-16T06:06:08.511Z",
+      "config": {
+        "durationSeconds": 8,
+        "connections": 5
+      },
+      "result": {
+        "totalRequests": 147,
+        "requestsPerSecAvg": 18.056749785038694,
+        "throughputBytesPerSecAvg": 1498.7102321582115,
+        "latencyMs": {
+          "min": 248.39389999999548,
+          "avg": 275.1794224489793,
+          "p50": 268.5969999999943,
+          "p95": 308.9740999999922,
+          "p99": 456.82730000000447,
+          "max": 459.55260000001
+        },
+        "errors": 0,
+        "timeouts": 0,
+        "non2xx": 147,
+        "non2xxRate": 1,
+        "statusCodeStats": {
+          "501": {
+            "count": 147
+          }
+        },
+        "failedSamples": [
+          {
+            "status": 501,
+            "body": {
+              "error": "Not implemented",
+              "message": "Authentication route is not configured yet."
+            }
+          },
+          {
+            "status": 501,
+            "body": {
+              "error": "Not implemented",
+              "message": "Authentication route is not configured yet."
+            }
+          },
+          {
+            "status": 501,
+            "body": {
+              "error": "Not implemented",
+              "message": "Authentication route is not configured yet."
+            }
+          },
+          {
+            "status": 501,
+            "body": {
+              "error": "Not implemented",
+              "message": "Authentication route is not configured yet."
+            }
+          },
+          {
+            "status": 501,
+            "body": {
+              "error": "Not implemented",
+              "message": "Authentication route is not configured yet."
+            }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "manual",
+      "name": "users_register_post_dynamic",
+      "method": "POST",
+      "path": "/api/users/register",
+      "url": "https://hermit-home.vercel.app/api/users/register",
+      "startedAt": "2026-04-16T06:06:08.511Z",
+      "finishedAt": "2026-04-16T06:06:20.253Z",
+      "config": {
+        "requests": 20,
+        "concurrency": 2
+      },
+      "result": {
+        "totalRequests": 20,
+        "requestsPerSecAvg": 1.7032873445750296,
+        "throughputBytesPerSecAvg": 0,
+        "latencyMs": {
+          "min": 1038.3919999999925,
+          "avg": 1170.653790000004,
+          "p50": 1076.3987000000197,
+          "p95": 1345.4324000000197,
+          "p99": 1370.3441999999923,
+          "max": 1370.3441999999923
+        },
+        "errors": 0,
+        "timeouts": 0,
+        "non2xx": 0,
+        "non2xxRate": 0,
+        "statusCodeStats": {
+          "201": {
+            "count": 20
+          }
+        },
+        "failedSamples": []
+      }
+    }
+  ],
+  "dbResults": {
+    "skipped": false,
+    "reason": null,
+    "benchmarkTag": "bench-1776319580259-d33bd2",
+    "operations": [
+      {
+        "name": "users_findOne_email_existing",
+        "iterations": 80,
+        "latencyMs": {
+          "min": 49.21719999998459,
+          "avg": 50.80295875000083,
+          "p50": 50.122400000022026,
+          "p95": 53.08950000000186,
+          "p99": 65.02180000001681,
+          "max": 65.02180000001681
+        }
+      },
+      {
+        "name": "users_findOne_email_missing",
+        "iterations": 80,
+        "latencyMs": {
+          "min": 49.140299999999115,
+          "avg": 54.186732499997014,
+          "p50": 50.09919999999693,
+          "p95": 57.166199999977835,
+          "p99": 316.5088000000105,
+          "max": 316.5088000000105
+        }
+      },
+      {
+        "name": "users_insertOne_unique",
+        "iterations": 80,
+        "latencyMs": {
+          "min": 52.08890000000247,
+          "avg": 53.76092374999971,
+          "p50": 53.13929999998072,
+          "p95": 56.093900000007125,
+          "p99": 66.10420000000158,
+          "max": 66.10420000000158
+        }
+      },
+      {
+        "name": "devices_findOne_deviceId",
+        "iterations": 80,
+        "latencyMs": {
+          "min": 49.08520000000135,
+          "avg": 51.46822874999962,
+          "p50": 50.102799999993294,
+          "p95": 60.04279999999562,
+          "p99": 75.31580000001122,
+          "max": 75.31580000001122
+        }
+      },
+      {
+        "name": "devices_findOneAndUpdate",
+        "iterations": 80,
+        "latencyMs": {
+          "min": 52.06049999999232,
+          "avg": 54.750504999997794,
+          "p50": 54.04509999998845,
+          "p95": 61.12770000001183,
+          "p99": 72.30919999998878,
+          "max": 72.30919999998878
+        }
+      },
+      {
+        "name": "telemetry_find_latest",
+        "iterations": 80,
+        "latencyMs": {
+          "min": 51.09810000000289,
+          "avg": 52.58170250000039,
+          "p50": 52.10999999998603,
+          "p95": 56.09619999999995,
+          "p99": 63.15450000000419,
+          "max": 63.15450000000419
+        }
+      },
+      {
+        "name": "telemetry_find_limit_30",
+        "iterations": 80,
+        "latencyMs": {
+          "min": 51.84209999997984,
+          "avg": 52.66921249999905,
+          "p50": 52.13650000002235,
+          "p95": 54.14859999998589,
+          "p99": 62.10879999998724,
+          "max": 62.10879999998724
+        }
+      },
+      {
+        "name": "device_states_find_recent_20",
+        "iterations": 80,
+        "latencyMs": {
+          "min": 50.05870000002324,
+          "avg": 52.24579875000127,
+          "p50": 51.13190000000759,
+          "p95": 59.22250000000349,
+          "p99": 65.17009999998845,
+          "max": 65.17009999998845
+        }
+      },
+      {
+        "name": "device_states_insertOne",
+        "iterations": 80,
+        "latencyMs": {
+          "min": 51.95450000002165,
+          "avg": 54.185749999998734,
+          "p50": 53.93960000001243,
+          "p95": 58.219499999977415,
+          "p99": 69.1030000000028,
+          "max": 69.1030000000028
+        }
+      },
+      {
+        "name": "password_reset_findOne_tokenHash_existing",
+        "iterations": 80,
+        "latencyMs": {
+          "min": 48.99569999999949,
+          "avg": 50.2921537500024,
+          "p50": 50.092600000003586,
+          "p95": 51.422500000015134,
+          "p99": 58.132500000006985,
+          "max": 58.132500000006985
+        }
+      },
+      {
+        "name": "password_reset_findOneAndUpdate_no_match",
+        "iterations": 80,
+        "latencyMs": {
+          "min": 49.08050000001094,
+          "avg": 50.40488750000186,
+          "p50": 50.10699999998906,
+          "p95": 53.07510000001639,
+          "p99": 57.014100000000326,
+          "max": 57.014100000000326
+        }
+      }
+    ],
+    "explain": {
+      "users_findOne_email": {
+        "executionTimeMillis": 0,
+        "nReturned": 1,
+        "totalKeysExamined": 0,
+        "totalDocsExamined": 96,
+        "stages": [
+          "LIMIT",
+          "COLLSCAN"
+        ],
+        "indexes": []
+      },
+      "telemetry_find_limit_30": {
+        "executionTimeMillis": 2,
+        "nReturned": 30,
+        "totalKeysExamined": 0,
+        "totalDocsExamined": 3127,
+        "stages": [
+          "SORT",
+          "COLLSCAN"
+        ],
+        "indexes": []
+      },
+      "device_states_find_recent_20": {
+        "executionTimeMillis": 0,
+        "nReturned": 20,
+        "totalKeysExamined": 0,
+        "totalDocsExamined": 604,
+        "stages": [
+          "SORT",
+          "COLLSCAN"
+        ],
+        "indexes": []
+      },
+      "password_reset_findOne_tokenHash": {
+        "executionTimeMillis": 0,
+        "nReturned": 1,
+        "totalKeysExamined": 1,
+        "totalDocsExamined": 1,
+        "stages": [
+          "EXPRESS_IXSCAN"
+        ],
+        "indexes": [
+          "token_hash_unique"
+        ]
+      }
+    },
+    "indexes": {
+      "users": [
+        {
+          "v": 2,
+          "key": {
+            "_id": 1
+          },
+          "name": "_id_"
+        },
+        {
+          "v": 2,
+          "key": {
+            "email": 1
+          },
+          "name": "email_unique",
+          "unique": true,
+          "collation": {
+            "locale": "en",
+            "caseLevel": false,
+            "caseFirst": "off",
+            "strength": 2,
+            "numericOrdering": false,
+            "alternate": "non-ignorable",
+            "maxVariable": "punct",
+            "normalization": false,
+            "backwards": false,
+            "version": "57.1"
+          }
+        }
+      ],
+      "devices": [
+        {
+          "v": 2,
+          "key": {
+            "_id": 1
+          },
+          "name": "_id_"
+        }
+      ],
+      "telemetry": [
+        {
+          "v": 2,
+          "key": {
+            "_id": 1
+          },
+          "name": "_id_"
+        }
+      ],
+      "device_states": [
+        {
+          "v": 2,
+          "key": {
+            "_id": 1
+          },
+          "name": "_id_"
+        }
+      ],
+      "password_reset_tokens": [
+        {
+          "v": 2,
+          "key": {
+            "_id": 1
+          },
+          "name": "_id_"
+        },
+        {
+          "v": 2,
+          "key": {
+            "tokenHash": 1
+          },
+          "name": "token_hash_unique",
+          "unique": true
+        },
+        {
+          "v": 2,
+          "key": {
+            "expiresAt": 1
+          },
+          "name": "expires_at_ttl",
+          "expireAfterSeconds": 0
+        },
+        {
+          "v": 2,
+          "key": {
+            "userId": 1,
+            "createdAt": -1
+          },
+          "name": "user_lookup_created_at"
+        }
+      ]
+    }
+  },
+  "bottlenecks": [
+    "[API] device_get p95=3423.38ms (>1200ms)",
+    "[API] device_get non2xx=100% (>5%)",
+    "[API] device_status_get p95=3233.75ms (>1200ms)",
+    "[API] device_status_get non2xx=100% (>5%)",
+    "[API] device_telemetry_get p95=3070.65ms (>1200ms)",
+    "[API] device_control_get p95=2532.59ms (>1200ms)",
+    "[API] device_patch p95=1904.42ms (>1200ms)",
+    "[API] device_override_post non2xx=100% (>5%)",
+    "[API] device_control_post non2xx=100% (>5%)",
+    "[API] users_login_post p95=2686.97ms (>1200ms)",
+    "[API] users_forgot_password_post p95=1769.36ms (>1200ms)",
+    "[API] users_reset_password_invalid_post p95=1890.19ms (>1200ms)",
+    "[API] users_reset_password_invalid_post non2xx=100% (>5%)",
+    "[API] reset_password_link_get p95=1769.31ms (>1200ms)",
+    "[API] auth_placeholder_get non2xx=100% (>5%)",
+    "[API] users_register_post_dynamic p95=1345.43ms (>1200ms)",
+    "[DB] users_findOne_email uses COLLSCAN",
+    "[DB] telemetry_find_limit_30 uses COLLSCAN",
+    "[DB] telemetry_find_limit_30 docsExamined/nReturned=104.23 (high scan ratio)",
+    "[DB] device_states_find_recent_20 uses COLLSCAN"
+  ]
+}

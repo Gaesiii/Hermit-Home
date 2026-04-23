@@ -1,0 +1,355 @@
+{
+  "total30m": 300,
+  "bySource": {
+    "ai-agent": 70,
+    "auth": 107,
+    "api": 123
+  },
+  "byStatus": {
+    "INFO": 4,
+    "PASS": 166,
+    "PENDING": 130
+  },
+  "byCategory": {
+    "AI": 3,
+    "AUTH": 107,
+    "COMMAND": 130,
+    "SYNC": 45,
+    "TELEMETRY": 15
+  },
+  "mqttAckPass": 0,
+  "mqttAckFail": 0,
+  "pending": 130,
+  "recent": [
+    {
+      "createdAt": "2026-04-21T05:02:50.048Z",
+      "source": "ai-agent",
+      "category": "AI",
+      "status": "INFO",
+      "message": "[INFO] Threshold update accepted by API.",
+      "relay": null,
+      "expectedState": null,
+      "acknowledgedState": null,
+      "commandRef": null
+    },
+    {
+      "createdAt": "2026-04-21T05:02:49.456Z",
+      "source": "auth",
+      "category": "AUTH",
+      "status": "PASS",
+      "message": "[PASS] Service API key validation succeeded.",
+      "relay": null,
+      "expectedState": null,
+      "acknowledgedState": null,
+      "commandRef": null
+    },
+    {
+      "createdAt": "2026-04-21T05:02:46.769Z",
+      "source": "ai-agent",
+      "category": "COMMAND",
+      "status": "PENDING",
+      "message": "[PENDING] Command (Light=OFF) sent to API, awaiting Edge acknowledgment.",
+      "relay": "light",
+      "expectedState": false,
+      "acknowledgedState": null,
+      "commandRef": "cmd-1776747766769-92e7ed"
+    },
+    {
+      "createdAt": "2026-04-21T05:02:46.769Z",
+      "source": "ai-agent",
+      "category": "COMMAND",
+      "status": "PENDING",
+      "message": "[PENDING] Command (Fan=OFF) sent to API, awaiting Edge acknowledgment.",
+      "relay": "fan",
+      "expectedState": false,
+      "acknowledgedState": null,
+      "commandRef": "cmd-1776747766769-92e7ed"
+    },
+    {
+      "createdAt": "2026-04-21T05:02:46.769Z",
+      "source": "ai-agent",
+      "category": "COMMAND",
+      "status": "PENDING",
+      "message": "[PENDING] Command (Mist=OFF) sent to API, awaiting Edge acknowledgment.",
+      "relay": "mist",
+      "expectedState": false,
+      "acknowledgedState": null,
+      "commandRef": "cmd-1776747766769-92e7ed"
+    },
+    {
+      "createdAt": "2026-04-21T05:02:46.769Z",
+      "source": "ai-agent",
+      "category": "COMMAND",
+      "status": "PENDING",
+      "message": "[PENDING] Command (Heater=OFF) sent to API, awaiting Edge acknowledgment.",
+      "relay": "heater",
+      "expectedState": false,
+      "acknowledgedState": null,
+      "commandRef": "cmd-1776747766769-92e7ed"
+    },
+    {
+      "createdAt": "2026-04-21T05:02:46.174Z",
+      "source": "auth",
+      "category": "AUTH",
+      "status": "PASS",
+      "message": "[PASS] Service API key validation succeeded.",
+      "relay": null,
+      "expectedState": null,
+      "acknowledgedState": null,
+      "commandRef": null
+    },
+    {
+      "createdAt": "2026-04-21T05:02:45.493Z",
+      "source": "ai-agent",
+      "category": "AI",
+      "status": "INFO",
+      "message": "[INFO] Threshold update accepted by API.",
+      "relay": null,
+      "expectedState": null,
+      "acknowledgedState": null,
+      "commandRef": null
+    },
+    {
+      "createdAt": "2026-04-21T05:02:44.797Z",
+      "source": "auth",
+      "category": "AUTH",
+      "status": "PASS",
+      "message": "[PASS] Service API key validation succeeded.",
+      "relay": null,
+      "expectedState": null,
+      "acknowledgedState": null,
+      "commandRef": null
+    },
+    {
+      "createdAt": "2026-04-21T05:02:44.119Z",
+      "source": "ai-agent",
+      "category": "AI",
+      "status": "INFO",
+      "message": "[INFO] Alert received: Hermit Home Danger State Detected",
+      "relay": null,
+      "expectedState": null,
+      "acknowledgedState": null,
+      "commandRef": null
+    },
+    {
+      "createdAt": "2026-04-21T05:02:43.700Z",
+      "source": "auth",
+      "category": "AUTH",
+      "status": "PASS",
+      "message": "[PASS] Service API key validation succeeded.",
+      "relay": null,
+      "expectedState": null,
+      "acknowledgedState": null,
+      "commandRef": null
+    },
+    {
+      "createdAt": "2026-04-21T05:02:32.025Z",
+      "source": "api",
+      "category": "SYNC",
+      "status": "PASS",
+      "message": "[PASS] Telemetry sync completed (12 rows).",
+      "relay": null,
+      "expectedState": null,
+      "acknowledgedState": null,
+      "commandRef": null
+    },
+    {
+      "createdAt": "2026-04-21T05:02:31.609Z",
+      "source": "auth",
+      "category": "AUTH",
+      "status": "PASS",
+      "message": "[PASS] Service API key validation succeeded.",
+      "relay": null,
+      "expectedState": null,
+      "acknowledgedState": null,
+      "commandRef": null
+    },
+    {
+      "createdAt": "2026-04-21T05:02:30.938Z",
+      "source": "api",
+      "category": "TELEMETRY",
+      "status": "PASS",
+      "message": "[PASS] Latest telemetry fetched successfully.",
+      "relay": null,
+      "expectedState": null,
+      "acknowledgedState": null,
+      "commandRef": null
+    },
+    {
+      "createdAt": "2026-04-21T05:02:30.533Z",
+      "source": "auth",
+      "category": "AUTH",
+      "status": "PASS",
+      "message": "[PASS] Service API key validation succeeded.",
+      "relay": null,
+      "expectedState": null,
+      "acknowledgedState": null,
+      "commandRef": null
+    },
+    {
+      "createdAt": "2026-04-21T05:02:17.109Z",
+      "source": "api",
+      "category": "SYNC",
+      "status": "PASS",
+      "message": "[PASS] Telemetry sync completed (12 rows).",
+      "relay": null,
+      "expectedState": null,
+      "acknowledgedState": null,
+      "commandRef": null
+    },
+    {
+      "createdAt": "2026-04-21T05:02:16.704Z",
+      "source": "auth",
+      "category": "AUTH",
+      "status": "PASS",
+      "message": "[PASS] Service API key validation succeeded.",
+      "relay": null,
+      "expectedState": null,
+      "acknowledgedState": null,
+      "commandRef": null
+    },
+    {
+      "createdAt": "2026-04-21T05:02:16.035Z",
+      "source": "api",
+      "category": "TELEMETRY",
+      "status": "PASS",
+      "message": "[PASS] Latest telemetry fetched successfully.",
+      "relay": null,
+      "expectedState": null,
+      "acknowledgedState": null,
+      "commandRef": null
+    },
+    {
+      "createdAt": "2026-04-21T05:02:15.618Z",
+      "source": "auth",
+      "category": "AUTH",
+      "status": "PASS",
+      "message": "[PASS] Service API key validation succeeded.",
+      "relay": null,
+      "expectedState": null,
+      "acknowledgedState": null,
+      "commandRef": null
+    },
+    {
+      "createdAt": "2026-04-21T05:02:01.765Z",
+      "source": "api",
+      "category": "TELEMETRY",
+      "status": "PASS",
+      "message": "[PASS] Latest telemetry fetched successfully.",
+      "relay": null,
+      "expectedState": null,
+      "acknowledgedState": null,
+      "commandRef": null
+    },
+    {
+      "createdAt": "2026-04-21T05:02:01.361Z",
+      "source": "auth",
+      "category": "AUTH",
+      "status": "PASS",
+      "message": "[PASS] Service API key validation succeeded.",
+      "relay": null,
+      "expectedState": null,
+      "acknowledgedState": null,
+      "commandRef": null
+    },
+    {
+      "createdAt": "2026-04-21T05:01:20.925Z",
+      "source": "api",
+      "category": "SYNC",
+      "status": "INFO",
+      "message": "[INFO] Alert received: E2E Diagnostic Alert",
+      "relay": null,
+      "expectedState": null,
+      "acknowledgedState": null,
+      "commandRef": null
+    },
+    {
+      "createdAt": "2026-04-21T05:01:20.487Z",
+      "source": "auth",
+      "category": "AUTH",
+      "status": "PASS",
+      "message": "[PASS] Service API key validation succeeded.",
+      "relay": null,
+      "expectedState": null,
+      "acknowledgedState": null,
+      "commandRef": null
+    },
+    {
+      "createdAt": "2026-04-21T05:01:19.797Z",
+      "source": "api",
+      "category": "COMMAND",
+      "status": "PENDING",
+      "message": "[PENDING] Command (Light=OFF) sent to API, awaiting Edge acknowledgment.",
+      "relay": "light",
+      "expectedState": false,
+      "acknowledgedState": null,
+      "commandRef": "cmd-1776747679797-679c86"
+    },
+    {
+      "createdAt": "2026-04-21T05:01:19.797Z",
+      "source": "api",
+      "category": "COMMAND",
+      "status": "PENDING",
+      "message": "[PENDING] Command (Fan=OFF) sent to API, awaiting Edge acknowledgment.",
+      "relay": "fan",
+      "expectedState": false,
+      "acknowledgedState": null,
+      "commandRef": "cmd-1776747679797-679c86"
+    },
+    {
+      "createdAt": "2026-04-21T05:01:19.797Z",
+      "source": "api",
+      "category": "COMMAND",
+      "status": "PENDING",
+      "message": "[PENDING] Command (Mist=OFF) sent to API, awaiting Edge acknowledgment.",
+      "relay": "mist",
+      "expectedState": false,
+      "acknowledgedState": null,
+      "commandRef": "cmd-1776747679797-679c86"
+    },
+    {
+      "createdAt": "2026-04-21T05:01:19.208Z",
+      "source": "auth",
+      "category": "AUTH",
+      "status": "PASS",
+      "message": "[PASS] Service API key validation succeeded.",
+      "relay": null,
+      "expectedState": null,
+      "acknowledgedState": null,
+      "commandRef": null
+    },
+    {
+      "createdAt": "2026-04-21T05:01:18.700Z",
+      "source": "ai-agent",
+      "category": "COMMAND",
+      "status": "PENDING",
+      "message": "[PENDING] Command (Light=ON) sent to API, awaiting Edge acknowledgment.",
+      "relay": "light",
+      "expectedState": true,
+      "acknowledgedState": null,
+      "commandRef": "cmd-1776747678700-4311b7"
+    },
+    {
+      "createdAt": "2026-04-21T05:01:18.700Z",
+      "source": "ai-agent",
+      "category": "COMMAND",
+      "status": "PENDING",
+      "message": "[PENDING] Command (Fan=OFF) sent to API, awaiting Edge acknowledgment.",
+      "relay": "fan",
+      "expectedState": false,
+      "acknowledgedState": null,
+      "commandRef": "cmd-1776747678700-4311b7"
+    },
+    {
+      "createdAt": "2026-04-21T05:01:18.700Z",
+      "source": "ai-agent",
+      "category": "COMMAND",
+      "status": "PENDING",
+      "message": "[PENDING] Command (Mist=OFF) sent to API, awaiting Edge acknowledgment.",
+      "relay": "mist",
+      "expectedState": false,
+      "acknowledgedState": null,
+      "commandRef": "cmd-1776747678700-4311b7"
+    }
+  ]
+}

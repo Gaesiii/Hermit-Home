@@ -1,0 +1,1323 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hermit Home Beach</title>
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700&display=swap");
+
+    :root {
+      --sky-top: #7edaff;
+      --sky-bottom: #ffdca5;
+      --sea-deep: #0f6ca8;
+      --sea-light: #5ed4ff;
+      --sand-main: #f7cc85;
+      --sand-dark: #dfaa66;
+      --palm-trunk: #905532;
+      --palm-leaf: #2f9d53;
+      --sun: #ffd15b;
+      --crab: #dd5f41;
+      --crab-dark: #bb4831;
+      --shell: #9b6d4b;
+      --shell-dark: #764a2e;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+    }
+
+    body {
+      overflow: hidden;
+      font-family: "Baloo 2", "Trebuchet MS", sans-serif;
+      background: #8be3ff;
+      color: #0d4f73;
+    }
+
+    .beach-scene {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-height: 620px;
+      overflow: hidden;
+      isolation: isolate;
+    }
+
+    .sky {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, var(--sky-top) 0%, #9ce8ff 35%, var(--sky-bottom) 58%);
+    }
+
+    .sun {
+      position: absolute;
+      top: 8%;
+      right: 9%;
+      width: clamp(90px, 11vw, 140px);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #fff7cb 0 25%, var(--sun) 45%, #ffb935 100%);
+      border: 3px solid #ffe7aa;
+      overflow: hidden;
+      box-shadow: 0 0 40px #ffd15bbb;
+    }
+
+    .sun .sun-photo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      border-radius: inherit;
+      display: block;
+    }
+
+    .cloud {
+      position: absolute;
+      width: clamp(120px, 18vw, 220px);
+      height: clamp(44px, 6vw, 78px);
+      border-radius: 999px;
+      background: #f4fbffdd;
+      filter: blur(0.2px);
+      animation: cloud-drift linear infinite;
+    }
+
+    .cloud::before,
+    .cloud::after {
+      content: "";
+      position: absolute;
+      border-radius: 999px;
+      background: inherit;
+    }
+
+    .cloud::before {
+      width: 38%;
+      height: 95%;
+      left: 13%;
+      top: -45%;
+    }
+
+    .cloud::after {
+      width: 34%;
+      height: 80%;
+      right: 10%;
+      top: -35%;
+    }
+
+    .cloud.one {
+      top: 11%;
+      left: -20%;
+      animation-duration: 40s;
+    }
+
+    .cloud.two {
+      top: 23%;
+      left: -25%;
+      scale: 0.8;
+      animation-duration: 55s;
+      animation-delay: -12s;
+    }
+
+    .cloud.three {
+      top: 6%;
+      left: -22%;
+      scale: 0.65;
+      animation-duration: 68s;
+      animation-delay: -24s;
+    }
+
+    .sea {
+      position: absolute;
+      top: 42%;
+      left: -3%;
+      width: 106%;
+      height: 21%;
+      background: linear-gradient(180deg, var(--sea-light) 0%, #1f9fd4 45%, var(--sea-deep) 100%);
+      border-top: 3px solid #a9f4ff;
+      overflow: hidden;
+    }
+
+    .sea::before,
+    .sea::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-repeat: repeat-x;
+      opacity: 0.38;
+    }
+
+    .sea::before {
+      top: 18%;
+      background-image: radial-gradient(circle at 20px -3px, #ffffffaa 0 22px, #0000 24px);
+      background-size: 64px 26px;
+      animation: wave-shift 5s linear infinite;
+    }
+
+    .sea::after {
+      top: 56%;
+      background-image: radial-gradient(circle at 16px -3px, #ffffff66 0 15px, #0000 16px);
+      background-size: 46px 20px;
+      animation: wave-shift 8s linear infinite reverse;
+    }
+
+    .sand {
+      position: absolute;
+      top: 60%;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(180deg, #fcd88f 0%, var(--sand-main) 45%, var(--sand-dark) 100%);
+    }
+
+    .sand::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        radial-gradient(circle at 8px 8px, #ffffff25 0 1.4px, #0000 1.5px),
+        radial-gradient(circle at 12px 14px, #00000014 0 1.2px, #0000 1.3px);
+      background-size: 26px 26px;
+      opacity: 0.45;
+    }
+
+    .title-card {
+      position: absolute;
+      top: clamp(14px, 3vw, 24px);
+      left: clamp(16px, 4vw, 40px);
+      z-index: 3;
+      padding: 10px 16px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #ffffffd8 0%, #f8ffffc7 100%);
+      backdrop-filter: blur(2px);
+      box-shadow: 0 10px 26px #1c5c7a1a;
+    }
+
+    .title-card h1 {
+      margin: 0;
+      font-size: clamp(1.1rem, 2.9vw, 1.8rem);
+      line-height: 1;
+      letter-spacing: 0.02em;
+    }
+
+    .title-card p {
+      margin: 4px 0 0;
+      font-size: clamp(0.8rem, 2vw, 1rem);
+      opacity: 0.86;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .console-toggle {
+      width: 34px;
+      height: 34px;
+      border: 0;
+      border-radius: 10px;
+      background: #0d4f73;
+      color: #ffffff;
+      font-size: 17px;
+      line-height: 1;
+      cursor: pointer;
+      box-shadow: 0 6px 16px #0d4f7340;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+    }
+
+    .console-toggle:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px #0d4f7361;
+    }
+
+    .console-toggle:active {
+      transform: translateY(0);
+    }
+
+    .console-toggle.has-fail {
+      background: #8c1c14;
+      animation: pulse-fail 1.2s ease-in-out infinite;
+    }
+
+    .console-overlay {
+      position: fixed;
+      inset: 0;
+      background: #03223887;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 30;
+      padding: 16px;
+    }
+
+    .console-overlay.visible {
+      display: flex;
+    }
+
+    .console-panel {
+      width: min(940px, 96vw);
+      max-height: 84vh;
+      background: linear-gradient(180deg, #081f30 0%, #0c2b42 100%);
+      border-radius: 16px;
+      border: 1px solid #3b8ab130;
+      color: #c8e9fb;
+      box-shadow: 0 22px 48px #00131f85;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .console-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-bottom: 1px solid #4ca4cf28;
+      background: #0d2f48;
+      gap: 8px;
+    }
+
+    .console-title {
+      font-weight: 700;
+      font-size: 0.97rem;
+      letter-spacing: 0.02em;
+    }
+
+    .console-subtitle {
+      font-size: 0.78rem;
+      opacity: 0.78;
+      margin-top: 2px;
+    }
+
+    .console-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .console-btn {
+      border: 1px solid #5bb1d247;
+      border-radius: 8px;
+      background: #113b57;
+      color: #dbf3ff;
+      padding: 6px 10px;
+      font-family: inherit;
+      font-size: 0.76rem;
+      cursor: pointer;
+    }
+
+    .console-btn:hover {
+      background: #184966;
+    }
+
+    .console-status {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 10px 12px;
+      background: #0b2740;
+      border-bottom: 1px solid #4ca4cf1f;
+      font-size: 0.76rem;
+    }
+
+    .status-chip {
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #1a4662;
+      color: #d8effd;
+      border: 1px solid #69bbdd2b;
+    }
+
+    .status-chip.pass {
+      background: #1b4b2a;
+      border-color: #8df1af42;
+      color: #b5f2ca;
+    }
+
+    .status-chip.fail {
+      background: #5c1f1f;
+      border-color: #f18a8a5c;
+      color: #ffd2d2;
+    }
+
+    .console-log-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      overflow: auto;
+      max-height: 60vh;
+      font-family: "Consolas", "Courier New", monospace;
+      font-size: 0.79rem;
+      background: #061a29;
+    }
+
+    .console-log-item {
+      display: grid;
+      grid-template-columns: 66px 58px 80px 1fr;
+      gap: 8px;
+      align-items: start;
+      border-bottom: 1px solid #27516b30;
+      padding: 8px 10px;
+      line-height: 1.35;
+    }
+
+    .log-time {
+      color: #8ec7e1;
+      opacity: 0.88;
+    }
+
+    .log-status {
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
+    .log-status.PASS {
+      color: #8af0b1;
+    }
+
+    .log-status.FAIL {
+      color: #ffa9a9;
+    }
+
+    .log-status.PENDING {
+      color: #ffe19e;
+    }
+
+    .log-status.INFO {
+      color: #9fdefb;
+    }
+
+    .log-source {
+      color: #acd7ee;
+      text-transform: uppercase;
+      font-size: 0.68rem;
+      letter-spacing: 0.06em;
+      opacity: 0.86;
+    }
+
+    .log-message {
+      color: #d6edf9;
+      word-break: break-word;
+    }
+
+    .console-empty {
+      padding: 14px;
+      color: #abd4e8;
+      opacity: 0.84;
+      font-family: "Consolas", "Courier New", monospace;
+      font-size: 0.8rem;
+    }
+
+    .decor-layer,
+    .item-layer,
+    .crab-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .palm {
+      position: absolute;
+      bottom: 15%;
+      width: 120px;
+      height: 250px;
+      transform-origin: bottom center;
+      animation: palm-sway ease-in-out infinite;
+    }
+
+    .palm.left {
+      left: 2%;
+      animation-duration: 6s;
+    }
+
+    .palm.right {
+      right: 7%;
+      scale: 0.88;
+      animation-duration: 7s;
+      animation-delay: -2s;
+    }
+
+    .palm .trunk {
+      position: absolute;
+      bottom: 0;
+      left: 46%;
+      width: 28px;
+      height: 170px;
+      border-radius: 16px;
+      background: linear-gradient(180deg, #ae7145 0%, var(--palm-trunk) 100%);
+      transform: skewX(-8deg);
+      box-shadow: inset -4px 0 0 #70432160;
+    }
+
+    .palm .leaf {
+      position: absolute;
+      left: 50%;
+      top: 35px;
+      width: 86px;
+      height: 20px;
+      border-radius: 0 20px 20px 20px;
+      background: linear-gradient(90deg, #56c768 0%, var(--palm-leaf) 75%);
+      transform-origin: left center;
+      box-shadow: inset -8px 0 0 #1d7d3d40;
+    }
+
+    .palm .leaf.a {
+      rotate: -40deg;
+    }
+
+    .palm .leaf.b {
+      rotate: -12deg;
+      width: 98px;
+    }
+
+    .palm .leaf.c {
+      rotate: 18deg;
+      width: 92px;
+    }
+
+    .palm .leaf.d {
+      rotate: 44deg;
+      width: 84px;
+    }
+
+    .chair {
+      position: absolute;
+      right: 21%;
+      bottom: 14%;
+      width: 128px;
+      height: 56px;
+      z-index: 2;
+    }
+
+    .chair::before,
+    .chair::after {
+      content: "";
+      position: absolute;
+      background: #ffffffc7;
+      border-radius: 10px;
+      box-shadow: 0 3px 0 #00000018;
+    }
+
+    .chair::before {
+      width: 90px;
+      height: 28px;
+      left: 16px;
+      top: 4px;
+      transform: skewX(-20deg);
+      background: repeating-linear-gradient(
+        90deg,
+        #fffbf0 0 12px,
+        #f7b852 12px 22px
+      );
+      border: 2px solid #ffffff99;
+    }
+
+    .chair::after {
+      width: 118px;
+      height: 8px;
+      bottom: 10px;
+      left: 6px;
+      background: #8f5a33;
+    }
+
+    .umbrella {
+      position: absolute;
+      right: 33%;
+      bottom: 16%;
+      width: 140px;
+      height: 148px;
+      z-index: 2;
+    }
+
+    .umbrella::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 10px;
+      width: 120px;
+      height: 72px;
+      border-radius: 100px 100px 20px 20px;
+      background:
+        conic-gradient(
+          from 180deg,
+          #f8ffff 0deg 45deg,
+          #ff7d58 45deg 90deg,
+          #f8ffff 90deg 135deg,
+          #ff7d58 135deg 180deg
+        );
+      box-shadow: 0 4px 0 #00000012;
+    }
+
+    .umbrella::after {
+      content: "";
+      position: absolute;
+      left: 67px;
+      top: 52px;
+      width: 6px;
+      height: 92px;
+      border-radius: 6px;
+      background: #8a5d36;
+    }
+
+    .beach-item {
+      position: absolute;
+      width: 35px;
+      height: 35px;
+      display: grid;
+      place-items: center;
+      font-size: 21px;
+      line-height: 1;
+      border-radius: 50%;
+      background: #ffffff88;
+      box-shadow: 0 6px 10px #70451f2a;
+      transition: transform 0.2s ease, opacity 0.2s ease;
+      user-select: none;
+      z-index: 4;
+    }
+
+    .beach-item.hidden {
+      opacity: 0;
+      transform: scale(0.2);
+    }
+
+    .hermit {
+      position: absolute;
+      width: 80px;
+      height: 56px;
+      z-index: 6;
+      transform-origin: center;
+      filter: drop-shadow(0 8px 6px #00000022);
+      will-change: transform;
+    }
+
+    .hermit .shadow {
+      position: absolute;
+      width: 64px;
+      height: 14px;
+      left: 8px;
+      bottom: 1px;
+      border-radius: 50%;
+      background: #6b3c1c33;
+    }
+
+    .hermit .legs {
+      position: absolute;
+      left: 24px;
+      bottom: 10px;
+      width: 36px;
+      height: 11px;
+      border-bottom: 3px solid var(--crab-dark);
+    }
+
+    .hermit .legs::before,
+    .hermit .legs::after {
+      content: "";
+      position: absolute;
+      width: 18px;
+      height: 10px;
+      bottom: -4px;
+      border-bottom: 3px solid var(--crab-dark);
+    }
+
+    .hermit .legs::before {
+      left: -16px;
+      transform: rotate(18deg);
+    }
+
+    .hermit .legs::after {
+      right: -16px;
+      transform: rotate(-18deg);
+    }
+
+    .hermit .shell {
+      position: absolute;
+      left: 28px;
+      bottom: 16px;
+      width: 38px;
+      height: 29px;
+      border-radius: 55% 45% 42% 58%;
+      background: radial-gradient(circle at 24% 24%, #c29263 0 20%, var(--shell) 46%, var(--shell-dark) 100%);
+      box-shadow: inset -4px -5px 0 #6d442b57;
+    }
+
+    .hermit .torso {
+      position: absolute;
+      left: 18px;
+      bottom: 12px;
+      width: 36px;
+      height: 24px;
+      border-radius: 16px;
+      background: linear-gradient(180deg, #f07856 0%, var(--crab) 100%);
+      box-shadow: inset -4px -2px 0 #b8472f66;
+    }
+
+    .hermit .claw {
+      position: absolute;
+      bottom: 18px;
+      width: 14px;
+      height: 11px;
+      border-radius: 10px;
+      background: var(--crab);
+    }
+
+    .hermit .claw.left {
+      left: 6px;
+      rotate: 28deg;
+    }
+
+    .hermit .claw.right {
+      left: 50px;
+      rotate: -28deg;
+    }
+
+    .hermit .eye {
+      position: absolute;
+      width: 7px;
+      height: 14px;
+      border-radius: 10px;
+      background: var(--crab);
+      top: 6px;
+      box-shadow: inset 0 -4px 0 #b8472f6e;
+    }
+
+    .hermit .eye::after {
+      content: "";
+      position: absolute;
+      top: -4px;
+      left: 1px;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #151515;
+    }
+
+    .hermit .eye.left {
+      left: 24px;
+    }
+
+    .hermit .eye.right {
+      left: 38px;
+    }
+
+    .hermit .held-item {
+      position: absolute;
+      left: 6px;
+      top: -10px;
+      width: 22px;
+      height: 22px;
+      display: grid;
+      place-items: center;
+      font-size: 16px;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+      transform-origin: center;
+    }
+
+    .hermit.walking .legs {
+      animation: leg-trot 0.22s steps(2, end) infinite;
+    }
+
+    .hermit.walking .shell {
+      animation: shell-bob 0.45s ease-in-out infinite;
+    }
+
+    .hermit.carrying .held-item {
+      opacity: 1;
+      animation: toy-spin 1.2s linear infinite;
+    }
+
+    @media (max-width: 720px) {
+      .title-card p {
+        display: none;
+      }
+
+      .umbrella {
+        right: 6%;
+        bottom: 19%;
+        scale: 0.85;
+      }
+
+      .chair {
+        right: 38%;
+        bottom: 13%;
+        scale: 0.86;
+      }
+
+      .palm.right {
+        right: -1%;
+        bottom: 18%;
+        scale: 0.75;
+      }
+    }
+
+    @keyframes cloud-drift {
+      from {
+        transform: translateX(0);
+      }
+      to {
+        transform: translateX(150vw);
+      }
+    }
+
+    @keyframes wave-shift {
+      from {
+        background-position-x: 0;
+      }
+      to {
+        background-position-x: 220px;
+      }
+    }
+
+    @keyframes palm-sway {
+      0%,
+      100% {
+        transform: rotate(1deg);
+      }
+      50% {
+        transform: rotate(-2deg);
+      }
+    }
+
+    @keyframes leg-trot {
+      from {
+        transform: translateY(0);
+      }
+      to {
+        transform: translateY(1px);
+      }
+    }
+
+    @keyframes shell-bob {
+      0%,
+      100% {
+        transform: translateY(0);
+      }
+      50% {
+        transform: translateY(-1px);
+      }
+    }
+
+    @keyframes toy-spin {
+      from {
+        transform: rotate(0deg) translateY(0);
+      }
+      25% {
+        transform: rotate(90deg) translateY(-1px);
+      }
+      50% {
+        transform: rotate(180deg) translateY(0);
+      }
+      75% {
+        transform: rotate(270deg) translateY(-1px);
+      }
+      to {
+        transform: rotate(360deg) translateY(0);
+      }
+    }
+
+    @keyframes pulse-fail {
+      0%,
+      100% {
+        box-shadow: 0 6px 16px #7f1f1f3d;
+      }
+      50% {
+        box-shadow: 0 8px 18px #d73b3b99;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="beach-scene" id="beachScene">
+    <div class="sky"></div>
+    <div class="sun">
+      <img class="sun-photo" src="/images/p-sun.webp" alt="Portrait sun" />
+    </div>
+    <div class="cloud one"></div>
+    <div class="cloud two"></div>
+    <div class="cloud three"></div>
+    <div class="sea"></div>
+    <div class="sand"></div>
+
+    <section class="title-card">
+      <div class="title-row">
+        <h1>Hermit Home Beach</h1>
+        <button
+          id="consoleToggle"
+          class="console-toggle"
+          type="button"
+          aria-label="Open live diagnostic console"
+          title="Live Diagnostic Console"
+        >&#x2328;</button>
+      </div>
+      <p>5 playful hermits roaming the sand.</p>
+    </section>
+
+    <div class="decor-layer">
+      <div class="palm left">
+        <div class="trunk"></div>
+        <div class="leaf a"></div>
+        <div class="leaf b"></div>
+        <div class="leaf c"></div>
+        <div class="leaf d"></div>
+      </div>
+      <div class="palm right">
+        <div class="trunk"></div>
+        <div class="leaf a"></div>
+        <div class="leaf b"></div>
+        <div class="leaf c"></div>
+        <div class="leaf d"></div>
+      </div>
+      <div class="umbrella"></div>
+      <div class="chair"></div>
+    </div>
+
+    <div class="item-layer" id="itemLayer"></div>
+    <div class="crab-layer" id="crabLayer"></div>
+  </main>
+
+  <aside id="consoleOverlay" class="console-overlay" aria-hidden="true">
+    <section class="console-panel" role="dialog" aria-modal="true" aria-label="Live Diagnostic Console">
+      <header class="console-head">
+        <div>
+          <div class="console-title">Live Diagnostic Console</div>
+          <div class="console-subtitle">Telemetry sync, command execution, AI actions, auth validation</div>
+        </div>
+        <div class="console-actions">
+          <button id="consoleRefreshBtn" class="console-btn" type="button">Refresh</button>
+          <button id="consoleCloseBtn" class="console-btn" type="button">Close</button>
+        </div>
+      </header>
+      <div id="consoleStatusBar" class="console-status"></div>
+      <ul id="consoleLogList" class="console-log-list"></ul>
+      <div id="consoleEmpty" class="console-empty" hidden>Waiting for diagnostic logs...</div>
+    </section>
+  </aside>
+
+  <script>
+    (function () {
+      const crabCount = 5;
+      const itemIcons = ["🐚", "⭐", "🪣", "🩴", "🥥", "🍍", "🧴", "🎾"];
+
+      const beachScene = document.getElementById("beachScene");
+      const itemLayer = document.getElementById("itemLayer");
+      const crabLayer = document.getElementById("crabLayer");
+      const consoleToggle = document.getElementById("consoleToggle");
+      const consoleOverlay = document.getElementById("consoleOverlay");
+      const consoleCloseBtn = document.getElementById("consoleCloseBtn");
+      const consoleRefreshBtn = document.getElementById("consoleRefreshBtn");
+      const consoleStatusBar = document.getElementById("consoleStatusBar");
+      const consoleLogList = document.getElementById("consoleLogList");
+      const consoleEmpty = document.getElementById("consoleEmpty");
+
+      const items = [];
+      const crabs = [];
+      const DIAGNOSTIC_POLL_MS = 4000;
+      let diagnosticsOnline = false;
+      let diagnosticsFetchAt = null;
+
+      const randomBetween = (min, max) => Math.random() * (max - min) + min;
+      const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+      const toClock = (isoValue) => {
+        if (!isoValue) {
+          return "--:--:--";
+        }
+        const date = new Date(isoValue);
+        if (Number.isNaN(date.getTime())) {
+          return "--:--:--";
+        }
+        return date.toLocaleTimeString([], { hour12: false });
+      };
+
+      const iconState = (state) => (state ? "ON" : "OFF");
+
+      const setConsoleIconFailState = (hasFail) => {
+        if (!consoleToggle) {
+          return;
+        }
+        consoleToggle.classList.toggle("has-fail", hasFail);
+      };
+
+      const renderStatusBar = (logs, hasError) => {
+        if (!consoleStatusBar) {
+          return;
+        }
+        const counters = { PASS: 0, FAIL: 0, PENDING: 0, INFO: 0 };
+        for (const log of logs) {
+          const key = typeof log.status === "string" ? log.status.toUpperCase() : "INFO";
+          if (key in counters) {
+            counters[key] += 1;
+          }
+        }
+
+        const sourceText = diagnosticsOnline && !hasError ? "Live" : "Disconnected";
+        const sourceClass = diagnosticsOnline && !hasError ? "pass" : "fail";
+        const refreshedText = diagnosticsFetchAt
+          ? "Updated " + diagnosticsFetchAt.toLocaleTimeString([], { hour12: false })
+          : "Waiting";
+
+        consoleStatusBar.innerHTML =
+          '<span class="status-chip ' + sourceClass + '">Stream: ' + sourceText + '</span>' +
+          '<span class="status-chip pass">PASS: ' + counters.PASS + '</span>' +
+          '<span class="status-chip fail">FAIL: ' + counters.FAIL + '</span>' +
+          '<span class="status-chip">PENDING: ' + counters.PENDING + '</span>' +
+          '<span class="status-chip">INFO: ' + counters.INFO + '</span>' +
+          '<span class="status-chip">' + refreshedText + '</span>';
+      };
+
+      const renderLogs = (logs, errorMessage) => {
+        if (!consoleLogList || !consoleEmpty) {
+          return;
+        }
+
+        consoleLogList.innerHTML = "";
+        if (errorMessage) {
+          const line = document.createElement("li");
+          line.className = "console-log-item";
+
+          const time = document.createElement("span");
+          time.className = "log-time";
+          time.textContent = "--:--:--";
+          line.appendChild(time);
+
+          const status = document.createElement("span");
+          status.className = "log-status FAIL";
+          status.textContent = "FAIL";
+          line.appendChild(status);
+
+          const source = document.createElement("span");
+          source.className = "log-source";
+          source.textContent = "api";
+          line.appendChild(source);
+
+          const message = document.createElement("span");
+          message.className = "log-message";
+          message.textContent = "[FAIL] Could not load diagnostic logs: " + errorMessage;
+          line.appendChild(message);
+
+          consoleLogList.appendChild(line);
+          consoleEmpty.hidden = true;
+          setConsoleIconFailState(true);
+          return;
+        }
+
+        if (!logs.length) {
+          consoleEmpty.hidden = false;
+          setConsoleIconFailState(false);
+          return;
+        }
+        consoleEmpty.hidden = true;
+
+        let hasFail = false;
+        for (const log of logs) {
+          const statusText = (log.status || "INFO").toUpperCase();
+          if (statusText === "FAIL") {
+            hasFail = true;
+          }
+
+          const line = document.createElement("li");
+          line.className = "console-log-item";
+
+          const time = document.createElement("span");
+          time.className = "log-time";
+          time.textContent = toClock(log.createdAt);
+          line.appendChild(time);
+
+          const status = document.createElement("span");
+          status.className = "log-status " + statusText;
+          status.textContent = statusText;
+          line.appendChild(status);
+
+          const source = document.createElement("span");
+          source.className = "log-source";
+          source.textContent = (log.source || "system").toString();
+          line.appendChild(source);
+
+          const message = document.createElement("span");
+          message.className = "log-message";
+          const relayText = log.relay ? " [" + log.relay + "=" + iconState(Boolean(log.expectedState)) + "]" : "";
+          const deviceText = log.deviceId ? " {device:" + log.deviceId + "}" : "";
+          message.textContent = (log.message || "[INFO] Event") + relayText + deviceText;
+          line.appendChild(message);
+
+          consoleLogList.appendChild(line);
+        }
+
+        setConsoleIconFailState(hasFail);
+      };
+
+      const fetchDiagnostics = async () => {
+        try {
+          const response = await fetch("/api/logs?limit=140", { cache: "no-store" });
+          if (!response.ok) {
+            throw new Error("HTTP " + response.status);
+          }
+          const payload = await response.json();
+          const logs = Array.isArray(payload.logs) ? payload.logs : [];
+          diagnosticsOnline = true;
+          diagnosticsFetchAt = new Date();
+          renderStatusBar(logs, false);
+          renderLogs(logs, null);
+        } catch (error) {
+          diagnosticsOnline = false;
+          diagnosticsFetchAt = new Date();
+          const message = error instanceof Error ? error.message : "unknown error";
+          renderStatusBar([], true);
+          renderLogs([], message);
+        }
+      };
+
+      const openConsole = () => {
+        if (!consoleOverlay) {
+          return;
+        }
+        consoleOverlay.classList.add("visible");
+        consoleOverlay.setAttribute("aria-hidden", "false");
+        fetchDiagnostics();
+      };
+
+      const closeConsole = () => {
+        if (!consoleOverlay) {
+          return;
+        }
+        consoleOverlay.classList.remove("visible");
+        consoleOverlay.setAttribute("aria-hidden", "true");
+      };
+
+      const bounds = () => {
+        const width = beachScene.clientWidth;
+        const height = beachScene.clientHeight;
+        const sandTop = height * 0.6;
+        return {
+          width,
+          height,
+          left: 18,
+          right: width - 98,
+          top: sandTop + 16,
+          bottom: height - 72
+        };
+      };
+
+      const setPoint = (element, x, y) => {
+        element.style.left = x + "px";
+        element.style.top = y + "px";
+      };
+
+      const chooseTarget = (crab, arena, now) => {
+        crab.targetX = randomBetween(arena.left, arena.right);
+        crab.targetY = randomBetween(arena.top, arena.bottom);
+        crab.nextTargetAt = now + randomBetween(1300, 3000);
+      };
+
+      const createItem = (id, icon, arena) => {
+        const element = document.createElement("div");
+        element.className = "beach-item";
+        element.textContent = icon;
+        itemLayer.appendChild(element);
+
+        const item = {
+          id,
+          icon,
+          element,
+          x: randomBetween(arena.left, arena.right),
+          y: randomBetween(arena.top, arena.bottom),
+          available: true,
+          heldBy: null
+        };
+        setPoint(element, item.x, item.y);
+        items.push(item);
+      };
+
+      const createCrab = (id, arena) => {
+        const element = document.createElement("div");
+        element.className = "hermit";
+        element.innerHTML =
+          '<div class="shadow"></div>' +
+          '<div class="legs"></div>' +
+          '<div class="shell"></div>' +
+          '<div class="torso"></div>' +
+          '<div class="claw left"></div>' +
+          '<div class="claw right"></div>' +
+          '<div class="eye left"></div>' +
+          '<div class="eye right"></div>' +
+          '<div class="held-item"></div>';
+        crabLayer.appendChild(element);
+
+        const now = performance.now();
+        const crab = {
+          id,
+          element,
+          heldElement: element.querySelector(".held-item"),
+          x: randomBetween(arena.left, arena.right),
+          y: randomBetween(arena.top, arena.bottom),
+          targetX: randomBetween(arena.left, arena.right),
+          targetY: randomBetween(arena.top, arena.bottom),
+          speed: randomBetween(26, 52),
+          facing: Math.random() > 0.5 ? 1 : -1,
+          holding: null,
+          dropAt: 0,
+          nextTargetAt: now + randomBetween(500, 1400),
+          nextPickupAt: now + randomBetween(800, 1600)
+        };
+        crabs.push(crab);
+      };
+
+      const nearestItem = (crab, maxDistance) => {
+        let winner = null;
+        let winnerDistance = Number.POSITIVE_INFINITY;
+        for (const item of items) {
+          if (!item.available) {
+            continue;
+          }
+          const dx = item.x - crab.x;
+          const dy = item.y - crab.y;
+          const distance = Math.hypot(dx, dy);
+          if (distance < maxDistance && distance < winnerDistance) {
+            winner = item;
+            winnerDistance = distance;
+          }
+        }
+        return winner;
+      };
+
+      const pickupItem = (crab, item, now) => {
+        item.available = false;
+        item.heldBy = crab.id;
+        item.element.classList.add("hidden");
+
+        crab.holding = item;
+        crab.dropAt = now + randomBetween(1900, 4400);
+        crab.heldElement.textContent = item.icon;
+        crab.element.classList.add("carrying");
+      };
+
+      const dropItem = (crab, arena) => {
+        if (!crab.holding) {
+          return;
+        }
+
+        const item = crab.holding;
+        item.x = clamp(crab.x + randomBetween(-58, 58), arena.left, arena.right);
+        item.y = clamp(crab.y + randomBetween(-18, 34), arena.top, arena.bottom);
+        item.available = true;
+        item.heldBy = null;
+        setPoint(item.element, item.x, item.y);
+        item.element.classList.remove("hidden");
+
+        crab.holding = null;
+        crab.heldElement.textContent = "";
+        crab.element.classList.remove("carrying");
+      };
+
+      const updateCrab = (crab, dt, now, arena) => {
+        const dx = crab.targetX - crab.x;
+        const dy = crab.targetY - crab.y;
+        const distance = Math.hypot(dx, dy);
+
+        if (distance < 7 || now > crab.nextTargetAt) {
+          chooseTarget(crab, arena, now);
+        }
+
+        if (distance > 0.001) {
+          const step = Math.min(distance, crab.speed * dt);
+          crab.x += (dx / distance) * step;
+          crab.y += (dy / distance) * step;
+          crab.element.classList.add("walking");
+          if (Math.abs(dx) > 0.4) {
+            crab.facing = dx > 0 ? 1 : -1;
+          }
+        } else {
+          crab.element.classList.remove("walking");
+        }
+
+        crab.x = clamp(crab.x, arena.left, arena.right);
+        crab.y = clamp(crab.y, arena.top, arena.bottom);
+
+        if (crab.holding && now >= crab.dropAt) {
+          dropItem(crab, arena);
+        }
+
+        if (!crab.holding && now >= crab.nextPickupAt) {
+          const candidate = nearestItem(crab, 76);
+          if (candidate && Math.random() > 0.12) {
+            pickupItem(crab, candidate, now);
+          }
+          crab.nextPickupAt = now + randomBetween(650, 1700);
+        }
+
+        const bob = Math.sin(now / 220 + crab.id * 2.1) * 2.1;
+        crab.element.style.transform =
+          "translate(" + crab.x + "px," + (crab.y + bob) + "px) scaleX(" + crab.facing + ")";
+      };
+
+      const reflow = () => {
+        const arena = bounds();
+        for (const item of items) {
+          if (item.heldBy !== null) {
+            continue;
+          }
+          item.x = clamp(item.x, arena.left, arena.right);
+          item.y = clamp(item.y, arena.top, arena.bottom);
+          setPoint(item.element, item.x, item.y);
+        }
+        for (const crab of crabs) {
+          crab.x = clamp(crab.x, arena.left, arena.right);
+          crab.y = clamp(crab.y, arena.top, arena.bottom);
+          crab.targetX = clamp(crab.targetX, arena.left, arena.right);
+          crab.targetY = clamp(crab.targetY, arena.top, arena.bottom);
+        }
+      };
+
+      const start = () => {
+        const arena = bounds();
+        itemIcons.forEach((icon, index) => createItem(index, icon, arena));
+        for (let index = 0; index < crabCount; index += 1) {
+          createCrab(index, arena);
+        }
+
+        let previous = performance.now();
+        const tick = (now) => {
+          const dt = Math.min((now - previous) / 1000, 0.06);
+          previous = now;
+          const nextArena = bounds();
+          for (const crab of crabs) {
+            updateCrab(crab, dt, now, nextArena);
+          }
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      };
+
+      if (consoleToggle) {
+        consoleToggle.addEventListener("click", openConsole);
+      }
+      if (consoleCloseBtn) {
+        consoleCloseBtn.addEventListener("click", closeConsole);
+      }
+      if (consoleRefreshBtn) {
+        consoleRefreshBtn.addEventListener("click", fetchDiagnostics);
+      }
+      if (consoleOverlay) {
+        consoleOverlay.addEventListener("click", (event) => {
+          if (event.target === consoleOverlay) {
+            closeConsole();
+          }
+        });
+      }
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          closeConsole();
+        }
+      });
+
+      start();
+      addEventListener("resize", reflow);
+      fetchDiagnostics();
+      setInterval(fetchDiagnostics, DIAGNOSTIC_POLL_MS);
+    })();
+  </script>
+</body>
+</html>

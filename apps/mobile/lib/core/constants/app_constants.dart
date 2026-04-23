@@ -8,12 +8,13 @@ class AppConstants {
     defaultValue: 'https://hermit-home.vercel.app',
   );
 
-  static const String registerEndpoint = '/api/users/register';
-  static const String loginEndpoint = '/api/users/login';
-  static const String forgotPasswordEndpoint = '/api/users/forgot-password';
-  static const String resetPasswordEndpoint = '/api/users/reset-password';
+  static const String registerEndpoint = '/api/auth?action=register';
+  static const String loginEndpoint = '/api/auth?action=login';
+  static const String forgotPasswordEndpoint =
+      '/api/auth?action=forgot-password';
+  static const String resetPasswordEndpoint = '/api/auth?action=reset-password';
   static const String validateResetTokenEndpoint =
-      '/api/users/validate-reset-token';
+      '/api/auth?action=validate-reset-token';
 
   static const String resetLinkScheme = String.fromEnvironment(
     'PASSWORD_RESET_DEEPLINK_SCHEME',
@@ -29,11 +30,13 @@ class AppConstants {
 
   static String deviceByIdEndpoint(String deviceId) => '/api/devices/$deviceId';
   static String deviceStatusEndpoint(String deviceId) =>
-      '/api/devices/$deviceId/status';
+      '/api/devices/$deviceId/data?type=latest';
+  static String deviceTelemetryEndpoint(String deviceId, {int limit = 30}) =>
+      '/api/devices/$deviceId/data?type=history&limit=$limit';
   static String deviceOverrideEndpoint(String deviceId) =>
-      '/api/devices/$deviceId/override';
+      '/api/devices/$deviceId/action?type=override';
   static String deviceControlEndpoint(String deviceId) =>
-      '/api/devices/$deviceId/control';
+      '/api/devices/$deviceId/action?type=control';
   static String deviceChatboxEndpoint(String deviceId) =>
       '/api/devices/$deviceId/chatbox';
 

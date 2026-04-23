@@ -48,6 +48,8 @@ bool g_mqttWasConnected = false;
 uint32_t t_lastSensor   = 0;
 uint32_t t_lastPublish  = 0;
 String g_activeUserId;
+uint32_t g_remoteOfflineSinceMs = 0;
+bool g_localFallbackActive = false;
 
 static inline void enforceMistSafetyLock() {
 #if MIST_SAFETY_LOCK
@@ -73,12 +75,10 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
         // (e.g., instant User Overrides)
         relays.applyAll(g_relayState);
 
-        // 3. Publish per-device command acknowledgements for manual overrides.
-        // This makes end-to-end verification easier on the backend side:
-        // API -> MQTT command -> ESP32 apply -> MQTT confirm.
-        if (doc["user_override"].as<bool>() == true) {
-            JsonObjectConst devicesObj = doc["devices"].as<JsonObjectConst>();
-
+        // 3. Publish per-device acknowledgements whenever a payload contains
+        // a "devices" object (user override or AI direct control).
+        JsonObjectConst devicesObj = doc["devices"].as<JsonObjectConst>();
+        if (!devicesObj.isNull()) {
             if (devicesObj["heater"].is<bool>()) {
                 mqtt.publishConfirmation("heater", g_relayState.heater);
             }
@@ -123,7 +123,6 @@ void setup() {
 // ================================================================
 void loop() {
     uint32_t now = millis();
-    bool prevConnected = g_mqttWasConnected;
 
     wifi.loop();
     const String& currentUserId = wifi.getUserId();
@@ -137,10 +136,30 @@ void loop() {
     // ----------------------------------------------------------------
     mqtt.maintainConnection(g_mqttWasConnected);
 
-    // If the connection just dropped, clear any active user override 
-    // to force the system back into local autonomous survival mode.
-    if (prevConnected && !g_mqttWasConnected) {
-        priority.clearUserOverride();
+    const bool remoteControlOnline =
+        wifi.isConnected() && mqtt.isConnected() && !g_activeUserId.isEmpty();
+
+    if (remoteControlOnline) {
+        if (g_localFallbackActive) {
+            g_localFallbackActive = false;
+            Serial.println(F("[Control] Cloud/Agent link restored. Leaving ESP local fallback mode."));
+        }
+        g_remoteOfflineSinceMs = 0;
+    } else {
+        if (g_remoteOfflineSinceMs == 0) {
+            g_remoteOfflineSinceMs = now;
+            Serial.println(F("[Control] Cloud/Agent link offline. Waiting before ESP local fallback..."));
+        }
+
+        if (!g_localFallbackActive &&
+            (now - g_remoteOfflineSinceMs) >= LOCAL_FALLBACK_DELAY_MS) {
+            g_localFallbackActive = true;
+            priority.clearUserOverride();
+            Serial.printf(
+                "[Control] Offline >= %lu ms. ESP local hardcoded hysteresis ENABLED.\n",
+                static_cast<unsigned long>(LOCAL_FALLBACK_DELAY_MS)
+            );
+        }
     }
 
     // ----------------------------------------------------------------
@@ -158,8 +177,12 @@ void loop() {
             g_relayState.mist = false;
         } 
         else {
-            // NORMAL OPERATION: If User is NOT overriding, let AI/Local config rule
-            if (!priority.isUserOverrideActive()) {
+            // Local hardcoded fallback is only enabled when cloud control has
+            // been offline long enough. Otherwise keep current Agent/User state.
+            if (g_localFallbackActive) {
+                if (priority.isUserOverrideActive()) {
+                    priority.clearUserOverride();
+                }
                 hysteresis.evaluate(
                     sensors.getTemperature(), 
                     sensors.getHumidity(), 

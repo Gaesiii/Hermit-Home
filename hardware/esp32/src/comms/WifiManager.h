@@ -38,11 +38,14 @@ private:
                           const String& password,
                           const String& userId);
     bool _connectToWiFi(const String& ssid, const String& password);
+    void _printScanHint(const String& targetSsid);
     void _startApPortal();
     void _stopApPortal();
     void _configurePortalRoutes();
+    void _maintainStaConnection();
     void _checkBootReset();
     void _clearCredentials();
+    void _factoryResetAndReboot();
 
     // Web handlers
     void _handleRoot();
@@ -61,5 +64,6 @@ private:
     String _password;
     String _userId;
 
+    uint32_t _lastReconnectAttemptMs;
     uint32_t _bootPressStartMs;
 };

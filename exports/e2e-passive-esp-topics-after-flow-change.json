@@ -1,0 +1,9 @@
+{
+  "startedAt": "2026-04-21T06:12:33.803Z",
+  "telemetryTopic": "terrarium/telemetry/67c6fd9a9acfdbc1d05c22b1",
+  "confirmTopic": "terrarium/confirm/67c6fd9a9acfdbc1d05c22b1",
+  "telemetry": 0,
+  "confirm": 0,
+  "samples": [],
+  "finishedAt": "2026-04-21T06:13:04.698Z"
+}
