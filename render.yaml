@@ -1,0 +1,101 @@
+services:
+  - type: web
+    name: hermit-home-mqtt-worker
+    runtime: node
+    rootDir: services/mqtt-worker
+    plan: starter
+    autoDeploy: true
+    buildFilter:
+      paths:
+        - render.yaml
+        - services/mqtt-worker/**
+        - packages/shared-types/**
+    buildCommand: npm ci && npm --prefix ../../packages/shared-types run build && npm run build
+    startCommand: npm run start
+    healthCheckPath: /ping
+    maxShutdownDelaySeconds: 60
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB_NAME
+        value: "hermit-home"
+      - key: SERVICE_API_KEY
+        sync: false
+      - key: ALLOWED_DEVICE_IDS
+        sync: false
+      - key: ENFORCE_ALLOWED_DEVICE_IDS
+        value: "false"
+      - key: MQTT_BROKER
+        sync: false
+      - key: MQTT_PORT
+        value: "8883"
+      - key: MQTT_USER
+        sync: false
+      - key: MQTT_PASS
+        sync: false
+      - key: MQTT_CA_CERT
+        sync: false
+      - key: SELF_PING_URL
+        sync: false
+      - key: SELF_PING_INTERVAL_MS
+        value: "180000"
+      - key: SELF_PING_TIMEOUT_MS
+        value: "10000"
+      - key: AGENT_CONTROL_ENABLED
+        value: "false"
+      - key: AGENT_CONTROL_URL
+        value: "https://hermit-home.vercel.app/api/agent/control/cycle"
+      - key: AGENT_CONTROL_METHOD
+        value: "POST"
+      - key: AGENT_CONTROL_API_KEY
+        sync: false
+      - key: AGENT_CONTROL_INTERVAL_MS
+        value: "20000"
+      - key: AGENT_CONTROL_TIMEOUT_MS
+        value: "8000"
+      - key: AGENT_CONTROL_BODY_JSON
+        value: "{\"source\":\"mqtt-worker\",\"trigger\":\"interval\"}"
+
+  - type: worker
+    name: hermit-home-ai-agent
+    runtime: python
+    rootDir: services/ai-agent
+    plan: starter
+    autoDeploy: true
+    buildFilter:
+      paths:
+        - render.yaml
+        - services/ai-agent/**
+        - exports/**
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: python -u src/main.py
+    maxShutdownDelaySeconds: 60
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"
+      - key: API_BASE_URL
+        sync: false
+      - key: DEVICE_ID
+        sync: false
+      - key: SERVICE_API_KEY
+        sync: false
+      - key: HTTP_TIMEOUT_SECONDS
+        value: "10"
+      - key: CONTROL_INTERVAL_SECONDS
+        value: "30"
+      - key: TELEMETRY_WINDOW_SIZE
+        value: "12"
+      - key: TELEMETRY_CSV_PATH
+        value: "../../exports/telemetry-export.csv"
+      - key: MIST_SAFETY_LOCK_ENABLED
+        value: "true"
+      - key: EMERGENCY_RELEASE_DELAY_SECONDS
+        value: "2"
+      - key: USER_OVERRIDE_TAKEOVER_DELAY_SECONDS
+        value: "20"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: "gemini-2.5-flash"

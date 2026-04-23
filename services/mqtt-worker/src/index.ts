@@ -11,7 +11,10 @@ dotenv.config();
 const DEVICE_ID_REGEX = /^[a-f\d]{24}$/i;
 const DEFAULT_SELF_PING_INTERVAL_MS = 3 * 60 * 1000;
 const DEFAULT_SELF_PING_TIMEOUT_MS = 10_000;
+const DEFAULT_AGENT_CONTROL_INTERVAL_MS = 20_000;
+const DEFAULT_AGENT_CONTROL_TIMEOUT_MS = 8_000;
 const SELF_PING_USER_AGENT = 'mqtt-worker-self-keepalive/1.0';
+const AGENT_CONTROL_USER_AGENT = 'mqtt-worker-agent-control/1.0';
 const TELEMETRY_WILDCARD_TOPIC = 'terrarium/telemetry/+';
 const CONFIRM_WILDCARD_TOPIC = 'terrarium/confirm/+';
 
@@ -263,8 +266,130 @@ function startSelfKeepalivePingLoop(): void {
   logger.info({ targetUrl, intervalMs, timeoutMs }, 'Self keepalive ping loop enabled');
 }
 
+function parseAgentControlMethod(value: string | undefined): 'GET' | 'POST' {
+  if (!value) return 'POST';
+  const normalized = value.trim().toUpperCase();
+  return normalized === 'GET' ? 'GET' : 'POST';
+}
+
+function startAgentControlTriggerLoop(): void {
+  const enabled = parseBooleanFlag(process.env.AGENT_CONTROL_ENABLED);
+  if (!enabled) {
+    logger.info('Agent control trigger loop disabled. Set AGENT_CONTROL_ENABLED=true to enable.');
+    return;
+  }
+
+  const targetUrl = process.env.AGENT_CONTROL_URL?.trim();
+  if (!targetUrl) {
+    logger.warn('Agent control trigger loop disabled: missing AGENT_CONTROL_URL.');
+    return;
+  }
+
+  const intervalMs = parsePositiveInteger(
+    process.env.AGENT_CONTROL_INTERVAL_MS,
+    DEFAULT_AGENT_CONTROL_INTERVAL_MS
+  );
+  const timeoutMs = parsePositiveInteger(
+    process.env.AGENT_CONTROL_TIMEOUT_MS,
+    DEFAULT_AGENT_CONTROL_TIMEOUT_MS
+  );
+  const method = parseAgentControlMethod(process.env.AGENT_CONTROL_METHOD);
+  const apiKey = process.env.AGENT_CONTROL_API_KEY?.trim();
+  const bodyRaw = process.env.AGENT_CONTROL_BODY_JSON?.trim();
+  const defaultDeviceIdCandidate = process.env.DEVICE_ID?.trim();
+  const defaultAllowedDeviceIdCandidate = process.env.ALLOWED_DEVICE_IDS
+    ?.split(',')
+    .map((id) => id.trim())
+    .find((id) => DEVICE_ID_REGEX.test(id));
+
+  const defaultBodyPayload: Record<string, unknown> = {
+    source: 'mqtt-worker',
+    trigger: 'interval',
+  };
+
+  if (defaultDeviceIdCandidate && DEVICE_ID_REGEX.test(defaultDeviceIdCandidate)) {
+    defaultBodyPayload.deviceId = defaultDeviceIdCandidate;
+  } else if (defaultAllowedDeviceIdCandidate) {
+    defaultBodyPayload.deviceId = defaultAllowedDeviceIdCandidate;
+  }
+
+  let bodyToSend = JSON.stringify(defaultBodyPayload);
+  if (bodyRaw) {
+    try {
+      JSON.parse(bodyRaw);
+      bodyToSend = bodyRaw;
+    } catch {
+      logger.warn('AGENT_CONTROL_BODY_JSON is not valid JSON. Fallback to default payload.');
+    }
+  }
+
+  let inFlight = false;
+  let consecutiveFailures = 0;
+
+  const runTrigger = async (): Promise<void> => {
+    if (inFlight) {
+      logger.warn({ targetUrl }, 'Agent control trigger skipped because previous request is still in-flight');
+      return;
+    }
+
+    inFlight = true;
+    const startedAt = Date.now();
+
+    try {
+      const headers: Record<string, string> = {
+        'User-Agent': AGENT_CONTROL_USER_AGENT,
+      };
+
+      if (apiKey) {
+        headers['x-api-key'] = apiKey;
+      }
+
+      if (method === 'POST') {
+        headers['Content-Type'] = 'application/json';
+      }
+
+      const response = await fetch(targetUrl, {
+        method,
+        headers,
+        body: method === 'POST' ? bodyToSend : undefined,
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+
+      const durationMs = Date.now() - startedAt;
+      if (!response.ok) {
+        consecutiveFailures += 1;
+        logger.warn(
+          { targetUrl, method, status: response.status, durationMs, consecutiveFailures },
+          'Agent control trigger returned non-OK status'
+        );
+        return;
+      }
+
+      consecutiveFailures = 0;
+      logger.info({ targetUrl, method, status: response.status, durationMs }, 'Agent control trigger success');
+    } catch (error: unknown) {
+      consecutiveFailures += 1;
+      logger.warn({ err: error, targetUrl, method, consecutiveFailures }, 'Agent control trigger failed');
+    } finally {
+      inFlight = false;
+    }
+  };
+
+  void runTrigger();
+
+  setInterval(() => {
+    void runTrigger();
+  }, intervalMs);
+
+  logger.info(
+    { targetUrl, method, intervalMs, timeoutMs },
+    'Agent control trigger loop enabled'
+  );
+}
+
 startHealthServer();
 startSelfKeepalivePingLoop();
+startAgentControlTriggerLoop();
 bootstrap().catch((err: unknown) => {
   logger.fatal({ err }, 'Failed to bootstrap mqtt-worker');
   process.exit(1);

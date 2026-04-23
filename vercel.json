@@ -63,6 +63,10 @@
       "dest": "/services/api/api/auth/index.ts?action=register"
     },
     {
+      "src": "/api/agent/control/cycle",
+      "dest": "/services/api/api/agent/control/cycle.ts"
+    },
+    {
       "src": "/api/devices/([^/]+)/data",
       "dest": "/services/api/api/devices/[deviceId]/data.ts?deviceId=$1"
     },

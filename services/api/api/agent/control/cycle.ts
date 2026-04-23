@@ -1,0 +1,881 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { promises as fs } from 'fs';
+import path from 'path';
+import type { Db } from 'mongodb';
+import type { CommandPayload, RelayState, ThresholdConfig } from '@smart-terrarium/shared-types';
+import { withAuth, type AuthenticatedRequest } from '../../../lib/authMiddleware';
+import { connectToDatabase } from '../../../lib/mongoClient';
+import { publishCommand } from '../../../lib/mqttPublisher';
+import { sanitizeCommandPayload } from '../../../lib/mistSafety';
+import { handleApiPreflight, methodNotAllowed } from '../../../lib/http';
+import { insertCommandPendingLogs, insertDiagnosticLog } from '../../../lib/diagnosticLogRepo';
+
+const ALLOWED_METHODS = ['POST'] as const;
+const DEVICE_ID_REGEX = /^[a-f\d]{24}$/i;
+const DEFAULT_RECENT_WINDOW_SIZE = 24;
+const MAX_RECENT_WINDOW_SIZE = 120;
+const DEFAULT_EMERGENCY_RELEASE_DELAY_MS = 2000;
+const DEFAULT_MIST_SAFETY_LOCK_ENABLED = true;
+const DEFAULT_CSV_SAMPLE_SIZE = 600;
+
+const SAFETY_THRESHOLDS = {
+  temperature: { min: 24.0, max: 29.0 },
+  humidity: { min: 70.0, max: 85.0 },
+  lux: { min: 200.0, max: 500.0 },
+} as const;
+
+const IDEAL_THRESHOLDS: ThresholdConfig = {
+  temp_min: SAFETY_THRESHOLDS.temperature.min,
+  temp_max: SAFETY_THRESHOLDS.temperature.max,
+  hum_min: SAFETY_THRESHOLDS.humidity.min,
+  hum_max: SAFETY_THRESHOLDS.humidity.max,
+  lux_min: SAFETY_THRESHOLDS.lux.min,
+  lux_max: SAFETY_THRESHOLDS.lux.max,
+};
+
+const SAFE_BOUNDS = {
+  temp_min: { min: 20.0, max: 31.0 },
+  temp_max: { min: 22.0, max: 34.0 },
+  hum_min: { min: 55.0, max: 90.0 },
+  hum_max: { min: 60.0, max: 95.0 },
+  lux_min: { min: 80.0, max: 900.0 },
+  lux_max: { min: 100.0, max: 1300.0 },
+} as const;
+
+type TelemetryDocument = {
+  userId: string;
+  timestamp: Date | string;
+  temperature: number | null;
+  humidity: number | null;
+  lux: number | null;
+  sensor_fault: boolean;
+  user_override: boolean;
+  relays?: Partial<RelayState>;
+};
+
+type DeviceAlertDocument = {
+  deviceId: string;
+  userId: string;
+  source: 'ai-agent' | 'system' | 'user';
+  level: 'info' | 'warning' | 'critical';
+  title: string;
+  message: string;
+  danger_state: boolean;
+  reason?: string;
+  danger_reasons?: string[];
+  telemetry?: Record<string, unknown>;
+  actions?: Record<string, unknown>;
+  createdAt: Date;
+};
+
+type CsvContext = {
+  csvPath: string;
+  csvAvailable: boolean;
+  rowsConsidered: number;
+  temperatureAvg: number | null;
+  humidityAvg: number | null;
+  luxAvg: number | null;
+};
+
+function readQueryValue(value: string | string[] | undefined): string | null {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (Array.isArray(value) && value.length > 0) {
+    return value[0] ?? null;
+  }
+  return null;
+}
+
+function parseBooleanFlag(raw: string | undefined, fallback: boolean): boolean {
+  if (!raw) return fallback;
+  const normalized = raw.trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+}
+
+function parsePositiveInteger(raw: string | undefined, fallback: number): number {
+  if (!raw) return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) return fallback;
+  return parsed;
+}
+
+function asNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number.parseFloat(value.trim());
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function average(values: Array<number | null>): number | null {
+  const clean = values.filter((value): value is number => typeof value === 'number');
+  if (clean.length === 0) return null;
+  return clean.reduce((sum, value) => sum + value, 0) / clean.length;
+}
+
+function weightedAverage(items: Array<{ value: number | null; weight: number }>): number | null {
+  const valid = items.filter(
+    (item): item is { value: number; weight: number } =>
+      item.value !== null && Number.isFinite(item.value) && item.weight > 0,
+  );
+  if (valid.length === 0) return null;
+
+  const totalWeight = valid.reduce((sum, item) => sum + item.weight, 0);
+  if (totalWeight <= 0) return null;
+
+  const weightedSum = valid.reduce((sum, item) => sum + item.value * item.weight, 0);
+  return weightedSum / totalWeight;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function round(value: number, digits: number): number {
+  const factor = 10 ** digits;
+  return Math.round(value * factor) / factor;
+}
+
+function parseAllowedDeviceIdsFromEnv(): string[] {
+  const raw = process.env.ALLOWED_DEVICE_IDS || '';
+  return [...new Set(raw.split(',').map((item) => item.trim()).filter(Boolean))];
+}
+
+function parseBodyObject(body: unknown): Record<string, unknown> {
+  if (body && typeof body === 'object' && !Array.isArray(body)) {
+    return body as Record<string, unknown>;
+  }
+  return {};
+}
+
+function resolveTargetDeviceId(
+  req: AuthenticatedRequest,
+  body: Record<string, unknown>,
+): { deviceId: string | null; errorMessage: string | null } {
+  const bodyDeviceId = typeof body.deviceId === 'string' ? body.deviceId.trim() : '';
+  const queryDeviceId = readQueryValue(req.query.deviceId)?.trim() ?? '';
+  const envDeviceId = (process.env.AGENT_DEVICE_ID || process.env.DEVICE_ID || '').trim();
+  const allowedFromEnv = parseAllowedDeviceIdsFromEnv();
+
+  const fallbackAllowedDeviceId = allowedFromEnv.length === 1 ? allowedFromEnv[0] : '';
+  const deviceId = bodyDeviceId || queryDeviceId || envDeviceId || fallbackAllowedDeviceId;
+
+  if (!deviceId) {
+    return {
+      deviceId: null,
+      errorMessage:
+        'Missing target device ID.',
+    };
+  }
+
+  if (!DEVICE_ID_REGEX.test(deviceId)) {
+    return {
+      deviceId: null,
+      errorMessage: 'Invalid deviceId format. Expected a 24-character hex string.',
+    };
+  }
+
+  if (allowedFromEnv.length > 0 && !allowedFromEnv.includes(deviceId)) {
+    return {
+      deviceId: null,
+      errorMessage: 'Requested deviceId is not permitted by ALLOWED_DEVICE_IDS.',
+    };
+  }
+
+  return { deviceId, errorMessage: null };
+}
+
+async function resolveLatestTelemetryDeviceId(
+  db: Db,
+  allowedDeviceIds: string[],
+): Promise<string | null> {
+  const filter: Record<string, unknown> = {};
+  if (allowedDeviceIds.length > 0) {
+    filter.userId = { $in: allowedDeviceIds };
+  }
+
+  const latest = await db
+    .collection<TelemetryDocument>('telemetry')
+    .find(filter)
+    .sort({ timestamp: -1 })
+    .limit(1)
+    .next();
+
+  if (!latest || !DEVICE_ID_REGEX.test(latest.userId)) {
+    return null;
+  }
+
+  return latest.userId;
+}
+
+function buildAdaptiveThresholds(params: {
+  current: TelemetryDocument;
+  recent: TelemetryDocument[];
+  csvContext: CsvContext;
+}): ThresholdConfig {
+  const recentTemperatureAvg = average(params.recent.map((item) => asNumber(item.temperature)));
+  const recentHumidityAvg = average(params.recent.map((item) => asNumber(item.humidity)));
+  const recentLuxAvg = average(params.recent.map((item) => asNumber(item.lux)));
+
+  const targetTemp = weightedAverage([
+    { value: asNumber(params.current.temperature), weight: 0.25 },
+    { value: recentTemperatureAvg, weight: 0.55 },
+    { value: params.csvContext.temperatureAvg, weight: 0.20 },
+  ]);
+  const targetHum = weightedAverage([
+    { value: asNumber(params.current.humidity), weight: 0.25 },
+    { value: recentHumidityAvg, weight: 0.55 },
+    { value: params.csvContext.humidityAvg, weight: 0.20 },
+  ]);
+  const targetLux = weightedAverage([
+    { value: asNumber(params.current.lux), weight: 0.25 },
+    { value: recentLuxAvg, weight: 0.55 },
+    { value: params.csvContext.luxAvg, weight: 0.20 },
+  ]);
+
+  const thresholds: ThresholdConfig = { ...IDEAL_THRESHOLDS };
+
+  if (targetTemp !== null) {
+    thresholds.temp_min = targetTemp - 2.0;
+    thresholds.temp_max = targetTemp + 2.0;
+  }
+  if (targetHum !== null) {
+    thresholds.hum_min = targetHum - 7.0;
+    thresholds.hum_max = targetHum + 7.0;
+  }
+  if (targetLux !== null) {
+    thresholds.lux_min = targetLux - 150.0;
+    thresholds.lux_max = targetLux + 150.0;
+  }
+
+  thresholds.temp_min = clamp(
+    thresholds.temp_min,
+    SAFE_BOUNDS.temp_min.min,
+    SAFE_BOUNDS.temp_min.max,
+  );
+  thresholds.temp_max = clamp(
+    thresholds.temp_max,
+    SAFE_BOUNDS.temp_max.min,
+    SAFE_BOUNDS.temp_max.max,
+  );
+  thresholds.hum_min = clamp(thresholds.hum_min, SAFE_BOUNDS.hum_min.min, SAFE_BOUNDS.hum_min.max);
+  thresholds.hum_max = clamp(thresholds.hum_max, SAFE_BOUNDS.hum_max.min, SAFE_BOUNDS.hum_max.max);
+  thresholds.lux_min = clamp(thresholds.lux_min, SAFE_BOUNDS.lux_min.min, SAFE_BOUNDS.lux_min.max);
+  thresholds.lux_max = clamp(thresholds.lux_max, SAFE_BOUNDS.lux_max.min, SAFE_BOUNDS.lux_max.max);
+
+  if (thresholds.temp_max <= thresholds.temp_min) {
+    thresholds.temp_max = clamp(
+      thresholds.temp_min + 1.0,
+      SAFE_BOUNDS.temp_max.min,
+      SAFE_BOUNDS.temp_max.max,
+    );
+  }
+  if (thresholds.hum_max <= thresholds.hum_min) {
+    thresholds.hum_max = clamp(
+      thresholds.hum_min + 5.0,
+      SAFE_BOUNDS.hum_max.min,
+      SAFE_BOUNDS.hum_max.max,
+    );
+  }
+  if (thresholds.lux_max <= thresholds.lux_min) {
+    thresholds.lux_max = clamp(
+      thresholds.lux_min + 50.0,
+      SAFE_BOUNDS.lux_max.min,
+      SAFE_BOUNDS.lux_max.max,
+    );
+  }
+
+  return {
+    temp_min: round(thresholds.temp_min, 1),
+    temp_max: round(thresholds.temp_max, 1),
+    hum_min: round(thresholds.hum_min, 1),
+    hum_max: round(thresholds.hum_max, 1),
+    lux_min: round(thresholds.lux_min, 0),
+    lux_max: round(thresholds.lux_max, 0),
+  };
+}
+
+function detectDangerReasons(telemetry: TelemetryDocument): string[] {
+  const reasons: string[] = [];
+  if (telemetry.sensor_fault === true) {
+    reasons.push('Sensor fault flag is active.');
+  }
+
+  const temperature = asNumber(telemetry.temperature);
+  const humidity = asNumber(telemetry.humidity);
+  const lux = asNumber(telemetry.lux);
+
+  if (temperature === null) {
+    reasons.push('Temperature telemetry is missing.');
+  } else if (temperature < SAFETY_THRESHOLDS.temperature.min) {
+    reasons.push(`Temperature too low (${temperature.toFixed(1)}C).`);
+  } else if (temperature > SAFETY_THRESHOLDS.temperature.max) {
+    reasons.push(`Temperature too high (${temperature.toFixed(1)}C).`);
+  }
+
+  if (humidity === null) {
+    reasons.push('Humidity telemetry is missing.');
+  } else if (humidity < SAFETY_THRESHOLDS.humidity.min) {
+    reasons.push(`Humidity too low (${humidity.toFixed(1)}%).`);
+  } else if (humidity > SAFETY_THRESHOLDS.humidity.max) {
+    reasons.push(`Humidity too high (${humidity.toFixed(1)}%).`);
+  }
+
+  if (lux === null) {
+    reasons.push('Lux telemetry is missing.');
+  } else if (lux < SAFETY_THRESHOLDS.lux.min) {
+    reasons.push(`Lux too low (${lux.toFixed(0)}).`);
+  } else if (lux > SAFETY_THRESHOLDS.lux.max) {
+    reasons.push(`Lux too high (${lux.toFixed(0)}).`);
+  }
+
+  return reasons;
+}
+
+function buildDesiredDevices(
+  telemetry: TelemetryDocument,
+  thresholds: ThresholdConfig,
+  mistSafetyLockEnabled: boolean,
+): Partial<RelayState> {
+  const devices: Partial<RelayState> = {};
+
+  const temperature = asNumber(telemetry.temperature);
+  const humidity = asNumber(telemetry.humidity);
+  const lux = asNumber(telemetry.lux);
+
+  if (temperature !== null) {
+    if (temperature < thresholds.temp_min) {
+      devices.heater = true;
+      devices.fan = false;
+    } else if (temperature > thresholds.temp_max) {
+      devices.heater = false;
+      devices.fan = true;
+    }
+  }
+
+  if (humidity !== null) {
+    if (humidity < thresholds.hum_min) {
+      if (mistSafetyLockEnabled) {
+        devices.mist = false;
+        devices.fan = false;
+      } else {
+        devices.mist = true;
+        if (devices.fan === undefined) {
+          devices.fan = false;
+        }
+      }
+    } else if (humidity > thresholds.hum_max) {
+      devices.mist = false;
+      devices.fan = true;
+    }
+  }
+
+  if (lux !== null) {
+    if (lux < thresholds.lux_min) {
+      devices.light = true;
+    } else if (lux > thresholds.lux_max) {
+      devices.light = false;
+    }
+  }
+
+  if (mistSafetyLockEnabled) {
+    devices.mist = false;
+  }
+
+  return devices;
+}
+
+function diffRelayPatch(
+  desired: Partial<RelayState>,
+  current: Partial<RelayState> | undefined,
+): Partial<RelayState> {
+  const patch: Partial<RelayState> = {};
+  const keys: Array<keyof RelayState> = ['heater', 'mist', 'fan', 'light'];
+
+  for (const key of keys) {
+    const desiredValue = desired[key];
+    if (typeof desiredValue !== 'boolean') {
+      continue;
+    }
+
+    const currentValue = current?.[key];
+    if (typeof currentValue !== 'boolean' || currentValue !== desiredValue) {
+      patch[key] = desiredValue;
+    }
+  }
+
+  return patch;
+}
+
+function parseCsvLine(line: string): string[] {
+  const output: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    if (char === '"') {
+      const isEscapedQuote = inQuotes && line[index + 1] === '"';
+      if (isEscapedQuote) {
+        current += '"';
+        index += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (char === ',' && !inQuotes) {
+      output.push(current);
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  output.push(current);
+  return output;
+}
+
+async function loadCsvContext(deviceId: string): Promise<CsvContext> {
+  const configuredPath = (
+    process.env.AGENT_TELEMETRY_CSV_PATH ||
+    process.env.TELEMETRY_CSV_PATH ||
+    'exports/telemetry-export.csv'
+  ).trim();
+  const resolvedPath = path.resolve(process.cwd(), configuredPath);
+  const sampleSize = parsePositiveInteger(process.env.AGENT_TELEMETRY_CSV_SAMPLE_SIZE, DEFAULT_CSV_SAMPLE_SIZE);
+
+  try {
+    const raw = await fs.readFile(resolvedPath, 'utf8');
+    const lines = raw.split(/\r?\n/).filter((line) => line.trim().length > 0);
+    if (lines.length <= 1) {
+      return {
+        csvPath: resolvedPath,
+        csvAvailable: true,
+        rowsConsidered: 0,
+        temperatureAvg: null,
+        humidityAvg: null,
+        luxAvg: null,
+      };
+    }
+
+    const header = parseCsvLine(lines[0]);
+    const userIdIndex = header.indexOf('userId');
+    const temperatureIndex = header.indexOf('temperature');
+    const humidityIndex = header.indexOf('humidity');
+    const luxIndex = header.indexOf('lux');
+
+    if (userIdIndex === -1 || temperatureIndex === -1 || humidityIndex === -1 || luxIndex === -1) {
+      return {
+        csvPath: resolvedPath,
+        csvAvailable: true,
+        rowsConsidered: 0,
+        temperatureAvg: null,
+        humidityAvg: null,
+        luxAvg: null,
+      };
+    }
+
+    const temperatures: Array<number | null> = [];
+    const humidities: Array<number | null> = [];
+    const luxValues: Array<number | null> = [];
+    let rows = 0;
+
+    for (let index = lines.length - 1; index >= 1; index -= 1) {
+      if (rows >= sampleSize) {
+        break;
+      }
+      const columns = parseCsvLine(lines[index]);
+      if ((columns[userIdIndex] || '').trim() !== deviceId) {
+        continue;
+      }
+
+      rows += 1;
+      temperatures.push(asNumber(columns[temperatureIndex]));
+      humidities.push(asNumber(columns[humidityIndex]));
+      luxValues.push(asNumber(columns[luxIndex]));
+    }
+
+    return {
+      csvPath: resolvedPath,
+      csvAvailable: true,
+      rowsConsidered: rows,
+      temperatureAvg: average(temperatures),
+      humidityAvg: average(humidities),
+      luxAvg: average(luxValues),
+    };
+  } catch {
+    return {
+      csvPath: resolvedPath,
+      csvAvailable: false,
+      rowsConsidered: 0,
+      temperatureAvg: null,
+      humidityAvg: null,
+      luxAvg: null,
+    };
+  }
+}
+
+function summarizeCommand(command: CommandPayload): Record<string, unknown> {
+  return {
+    user_override: command.user_override,
+    devices: command.devices || {},
+    thresholds: command.thresholds || {},
+  };
+}
+
+async function publishAndAuditCommand(params: {
+  deviceId: string;
+  userId: string;
+  command: CommandPayload;
+  reason: string;
+  metadata?: Record<string, unknown>;
+}): Promise<Record<string, unknown>> {
+  const safeCommand = sanitizeCommandPayload(params.command);
+  await publishCommand(params.deviceId, safeCommand);
+
+  const hasDevicePatch = !!safeCommand.devices && Object.keys(safeCommand.devices).length > 0;
+  if (hasDevicePatch) {
+    await insertCommandPendingLogs({
+      deviceId: params.deviceId,
+      userId: params.userId,
+      source: 'ai-agent',
+      stateUpdate: safeCommand.devices as Record<string, boolean>,
+      metadata: {
+        trigger: 'agent-control-cycle',
+        reason: params.reason,
+        ...(params.metadata || {}),
+      },
+    });
+  }
+
+  await insertDiagnosticLog({
+    deviceId: params.deviceId,
+    userId: params.userId,
+    source: 'ai-agent',
+    category: 'AI',
+    status: 'PASS',
+    message: `[PASS] Agent control cycle published command (${safeCommand.user_override ? 'override' : 'auto'}).`,
+    metadata: {
+      reason: params.reason,
+      command: summarizeCommand(safeCommand),
+      ...(params.metadata || {}),
+    },
+  });
+
+  return summarizeCommand(safeCommand);
+}
+
+async function persistDangerAlert(params: {
+  db: Db;
+  deviceId: string;
+  userId: string;
+  telemetry: TelemetryDocument;
+  reason: string;
+  dangerReasons: string[];
+  thresholds: ThresholdConfig;
+  desiredDevices: Partial<RelayState>;
+}): Promise<void> {
+  const alertEnabled = parseBooleanFlag(process.env.AGENT_CONTROL_ALERTS_ENABLED, true);
+  if (!alertEnabled) return;
+
+  const level: DeviceAlertDocument['level'] =
+    params.dangerReasons.length >= 2 || params.telemetry.sensor_fault ? 'critical' : 'warning';
+  const document: DeviceAlertDocument = {
+    deviceId: params.deviceId,
+    userId: params.userId,
+    source: 'ai-agent',
+    level,
+    title: 'Hermit Home Danger State Detected',
+    message: params.dangerReasons.slice(0, 3).join('; '),
+    danger_state: true,
+    reason: params.reason,
+    danger_reasons: params.dangerReasons.slice(0, 10),
+    telemetry: {
+      temperature: params.telemetry.temperature,
+      humidity: params.telemetry.humidity,
+      lux: params.telemetry.lux,
+      sensor_fault: params.telemetry.sensor_fault,
+      user_override: params.telemetry.user_override,
+      timestamp: params.telemetry.timestamp,
+    },
+    actions: {
+      desired_devices: params.desiredDevices,
+      thresholds: params.thresholds,
+      trigger: 'agent-control-cycle',
+    },
+    createdAt: new Date(),
+  };
+
+  await params.db.collection<DeviceAlertDocument>('device_alerts').insertOne(document);
+}
+
+async function runControlCycle(req: AuthenticatedRequest, res: VercelResponse): Promise<void> {
+  const body = parseBodyObject(req.body);
+  const { db } = await connectToDatabase();
+  const allowedFromEnv = parseAllowedDeviceIdsFromEnv();
+  let { deviceId, errorMessage } = resolveTargetDeviceId(req, body);
+
+  if (!deviceId) {
+    const inferredDeviceId = await resolveLatestTelemetryDeviceId(db, allowedFromEnv);
+    if (inferredDeviceId) {
+      deviceId = inferredDeviceId;
+    } else {
+      res.status(400).json({
+        error:
+          errorMessage ||
+          'Unable to resolve target deviceId. Provide deviceId in body/query, configure AGENT_DEVICE_ID/DEVICE_ID, or ensure telemetry exists for auto-inference.',
+      });
+      return;
+    }
+  }
+
+  const isServiceCall = typeof req.headers['x-api-key'] === 'string';
+  const requesterUserId = req.user.userId;
+  if (!isServiceCall && requesterUserId !== deviceId) {
+    res.status(403).json({
+      error: 'Forbidden',
+      message: 'You do not have permission to run control cycle for this device.',
+    });
+    return;
+  }
+
+  const effectiveUserId = requesterUserId === 'service-account' ? deviceId : requesterUserId;
+  const recentWindowSize = clamp(
+    parsePositiveInteger(process.env.AGENT_CONTROL_RECENT_WINDOW_SIZE, DEFAULT_RECENT_WINDOW_SIZE),
+    1,
+    MAX_RECENT_WINDOW_SIZE,
+  );
+  const mistSafetyLockEnabled = parseBooleanFlag(
+    process.env.AGENT_MIST_SAFETY_LOCK_ENABLED || process.env.MIST_SAFETY_LOCK_ENABLED,
+    DEFAULT_MIST_SAFETY_LOCK_ENABLED,
+  );
+  const emergencyReleaseDelayMs = clamp(
+    parsePositiveInteger(
+      process.env.AGENT_EMERGENCY_RELEASE_DELAY_MS,
+      DEFAULT_EMERGENCY_RELEASE_DELAY_MS,
+    ),
+    0,
+    30_000,
+  );
+
+  const telemetryCollection = db.collection<TelemetryDocument>('telemetry');
+  const latest = await telemetryCollection
+    .find({ userId: deviceId })
+    .sort({ timestamp: -1 })
+    .limit(1)
+    .next();
+
+  if (!latest) {
+    await insertDiagnosticLog({
+      deviceId,
+      userId: effectiveUserId,
+      source: 'ai-agent',
+      category: 'AI',
+      status: 'FAIL',
+      message: '[FAIL] Agent control cycle aborted: no telemetry found.',
+      metadata: {
+        trigger: 'agent-control-cycle',
+        recentWindowSize,
+      },
+    });
+
+    res.status(404).json({
+      error: 'No telemetry found for this device.',
+      deviceId,
+    });
+    return;
+  }
+
+  const recent = await telemetryCollection
+    .find({ userId: deviceId })
+    .sort({ timestamp: -1 })
+    .limit(recentWindowSize)
+    .toArray();
+  const csvContext = await loadCsvContext(deviceId);
+
+  const dangerReasons = detectDangerReasons(latest);
+  const dangerState = dangerReasons.length > 0;
+  const thresholds = buildAdaptiveThresholds({
+    current: latest,
+    recent,
+    csvContext,
+  });
+  const desiredDevices = buildDesiredDevices(latest, thresholds, mistSafetyLockEnabled);
+  const devicePatch = diffRelayPatch(desiredDevices, latest.relays);
+  const hasDevicePatch = Object.keys(devicePatch).length > 0;
+
+  const commandsToSend: CommandPayload[] = [];
+  let reason = 'Environment is within adaptive operating range.';
+
+  if (dangerState) {
+    reason = `Danger state detected: ${dangerReasons.join(' ')}`;
+
+    if (hasDevicePatch) {
+      commandsToSend.push({
+        user_override: true,
+        devices: devicePatch,
+      });
+    }
+
+    commandsToSend.push({
+      user_override: false,
+      thresholds,
+    });
+  } else if (!latest.user_override && hasDevicePatch) {
+    reason = 'Adjusting relays toward adaptive safe thresholds.';
+    commandsToSend.push({
+      user_override: false,
+      devices: devicePatch,
+    });
+  } else if (latest.user_override) {
+    reason = 'User override is active and no danger state is present; skipping automated relay command.';
+  }
+
+  const commandResults: Array<Record<string, unknown>> = [];
+
+  try {
+    for (let index = 0; index < commandsToSend.length; index += 1) {
+      const command = commandsToSend[index];
+      const isReleasingOverride =
+        index > 0 &&
+        commandsToSend[index - 1]?.user_override === true &&
+        command.user_override === false;
+      if (isReleasingOverride && emergencyReleaseDelayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, emergencyReleaseDelayMs));
+      }
+
+      const result = await publishAndAuditCommand({
+        deviceId,
+        userId: effectiveUserId,
+        command,
+        reason,
+        metadata: {
+          trigger: body.trigger || 'api',
+          source: body.source || 'agent-control-cycle',
+          commandIndex: index + 1,
+          totalCommands: commandsToSend.length,
+          dangerState,
+        },
+      });
+      commandResults.push(result);
+    }
+  } catch (error: unknown) {
+    await insertDiagnosticLog({
+      deviceId,
+      userId: effectiveUserId,
+      source: 'ai-agent',
+      category: 'AI',
+      status: 'FAIL',
+      message: '[FAIL] Agent control cycle failed to publish command.',
+      metadata: {
+        trigger: 'agent-control-cycle',
+        reason,
+        error: error instanceof Error ? error.message : 'unknown error',
+      },
+    });
+
+    res.status(502).json({
+      error: 'Failed to publish control command.',
+      deviceId,
+      reason,
+      dangerState,
+    });
+    return;
+  }
+
+  if (dangerState) {
+    try {
+      await persistDangerAlert({
+        db,
+        deviceId,
+        userId: effectiveUserId,
+        telemetry: latest,
+        reason,
+        dangerReasons,
+        thresholds,
+        desiredDevices: devicePatch,
+      });
+    } catch (error: unknown) {
+      await insertDiagnosticLog({
+        deviceId,
+        userId: effectiveUserId,
+        source: 'ai-agent',
+        category: 'AI',
+        status: 'INFO',
+        message: '[INFO] Danger state detected but alert persistence failed.',
+        metadata: {
+          trigger: 'agent-control-cycle',
+          error: error instanceof Error ? error.message : 'unknown error',
+        },
+      });
+    }
+  }
+
+  await insertDiagnosticLog({
+    deviceId,
+    userId: effectiveUserId,
+    source: 'ai-agent',
+    category: 'AI',
+    status: 'PASS',
+    message: `[PASS] Agent control cycle completed (${dangerState ? 'danger' : 'safe'} state).`,
+    metadata: {
+      trigger: 'agent-control-cycle',
+      reason,
+      dangerReasons,
+      commandCount: commandResults.length,
+      csvAvailable: csvContext.csvAvailable,
+      csvRowsConsidered: csvContext.rowsConsidered,
+      thresholds,
+    },
+  });
+
+  res.status(200).json({
+    success: true,
+    deviceId,
+    dangerState,
+    dangerReasons,
+    reason,
+    thresholds,
+    desiredDevices: devicePatch,
+    commandCount: commandResults.length,
+    commands: commandResults,
+    csvContext: {
+      csvPath: csvContext.csvPath,
+      csvAvailable: csvContext.csvAvailable,
+      rowsConsidered: csvContext.rowsConsidered,
+      temperatureAvg: csvContext.temperatureAvg,
+      humidityAvg: csvContext.humidityAvg,
+      luxAvg: csvContext.luxAvg,
+    },
+  });
+}
+
+const authenticatedHandler = withAuth(async (
+  req: AuthenticatedRequest,
+  res: VercelResponse,
+): Promise<void> => {
+  if (req.method !== 'POST') {
+    methodNotAllowed(req, res, ALLOWED_METHODS);
+    return;
+  }
+
+  await runControlCycle(req, res);
+});
+
+export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+  if (handleApiPreflight(req, res, ALLOWED_METHODS)) {
+    return;
+  }
+
+  if (req.method !== 'POST') {
+    methodNotAllowed(req, res, ALLOWED_METHODS);
+    return;
+  }
+
+  await authenticatedHandler(req, res);
+}
